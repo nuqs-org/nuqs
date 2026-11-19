@@ -68,7 +68,7 @@ func TestParseFixture(t *testing.T) {
 			Hostnames: []string{"nas.lan"}, // the empty PTR name is dropped
 			Services: []model.Service{
 				{Port: 21, Protocol: "tcp", Name: "ftp", Product: "vsftpd", Version: "3.0.3"},
-				{Port: 161, Protocol: "udp", Name: "snmp"},
+				{Port: 161, Protocol: "udp", Name: "snmp", Guessed: true}, // method="table"
 			},
 		},
 		// the MAC-only host has no IP, so it must be left out

@@ -131,6 +131,7 @@ type xmlHost struct {
 			Product string `xml:"product,attr"`
 			Version string `xml:"version,attr"`
 			Tunnel  string `xml:"tunnel,attr"`
+			Method  string `xml:"method,attr"` // "probed" or "table" (guessed from the port)
 		} `xml:"service"`
 	} `xml:"ports>port"`
 }
@@ -172,6 +173,7 @@ func Parse(r io.Reader) ([]model.Host, error) {
 				Product:  p.Service.Product,
 				Version:  p.Service.Version,
 				Tunnel:   p.Service.Tunnel,
+				Guessed:  p.Service.Method == "table",
 			})
 		}
 		hosts = append(hosts, h)

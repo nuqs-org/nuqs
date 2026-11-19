@@ -75,6 +75,17 @@ const (
 // Valid reports whether c is Confirmed or Inferred.
 func (c Confidence) Valid() bool { return c == Confirmed || c == Inferred }
 
+// UnmarshalText reads a confidence back and refuses unknown values, so a
+// broken saved report fails loudly.
+func (c *Confidence) UnmarshalText(b []byte) error {
+	v := Confidence(b)
+	if !v.Valid() {
+		return fmt.Errorf("unknown confidence %q", string(b))
+	}
+	*c = v
+	return nil
+}
+
 // Service is one open port on a host, plus whatever Nmap could tell about it.
 type Service struct {
 	Port     int    `json:"port"`
@@ -83,6 +94,9 @@ type Service struct {
 	Product  string `json:"product,omitempty"` // like "OpenSSH"
 	Version  string `json:"version,omitempty"` // like "9.6p1"
 	Tunnel   string `json:"tunnel,omitempty"`  // "ssl" when the service runs over TLS
+	// Guessed is true when Nmap couldn't recognise the service and only
+	// named it from the port number, like "telnet" for anything on port 23.
+	Guessed bool `json:"guessed,omitempty"`
 }
 
 // Host is one machine that answered during the scan.

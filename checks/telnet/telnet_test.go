@@ -40,3 +40,23 @@ func TestRunWithoutProduct(t *testing.T) {
 		t.Errorf("unexpected result: %+v, %v", res, err)
 	}
 }
+
+func TestRunGuessed(t *testing.T) {
+	res, err := Check{}.Run(context.Background(), check.Target{Host: "10.0.0.1", Service: model.Service{Port: 23, Protocol: "tcp", Name: "telnet", Guessed: true}})
+	if err != nil || res == nil {
+		t.Fatalf("expected a finding, got %v, %v", res, err)
+	}
+	if res.Confidence != model.Inferred {
+		t.Errorf("a guessed service must be inferred, got %q", res.Confidence)
+	}
+	if !strings.Contains(res.Evidence, "guessed Telnet from the port number") {
+		t.Errorf("evidence should say it was guessed: %q", res.Evidence)
+	}
+}
+
+func TestRunProbedIsConfirmed(t *testing.T) {
+	res, _ := Check{}.Run(context.Background(), check.Target{Host: "10.0.0.1", Service: model.Service{Port: 23, Protocol: "tcp", Name: "telnet"}})
+	if res.Confidence != "" {
+		t.Errorf("a probed service should leave confidence empty (confirmed), got %q", res.Confidence)
+	}
+}

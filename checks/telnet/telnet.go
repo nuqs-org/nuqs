@@ -28,8 +28,15 @@ func (Check) Info() check.Info {
 	}
 }
 
-// Run explains what Nmap found. It never fails.
+// Run explains what Nmap found. It never fails. If Nmap only guessed Telnet
+// from the port number, the finding is inferred, not confirmed.
 func (Check) Run(_ context.Context, t check.Target) (*check.Result, error) {
+	if t.Service.Guessed {
+		return &check.Result{
+			Evidence:   fmt.Sprintf("port %d/%s is open and Nmap guessed Telnet from the port number only", t.Service.Port, t.Service.Protocol),
+			Confidence: model.Inferred,
+		}, nil
+	}
 	what := strings.TrimSpace(t.Service.Product + " " + t.Service.Version)
 	if what == "" {
 		what = "a Telnet server"

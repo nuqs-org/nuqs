@@ -100,3 +100,15 @@ func TestConfidenceValid(t *testing.T) {
 		}
 	}
 }
+
+func TestConfidenceJSON(t *testing.T) {
+	var f Finding
+	if err := json.Unmarshal([]byte(`{"confidence": "inferred"}`), &f); err != nil || f.Confidence != Inferred {
+		t.Errorf("reading inferred: %v, %v", f.Confidence, err)
+	}
+	for _, bad := range []string{`{"confidence": "maybe"}`, `{"confidence": ""}`} {
+		if err := json.Unmarshal([]byte(bad), &f); err == nil {
+			t.Errorf("%s should fail", bad)
+		}
+	}
+}

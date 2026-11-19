@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nuqs-org/nuqs/internal/engine"
+	"github.com/nuqs-org/nuqs/internal/model"
 )
 
 // JSON writes the full report as indented JSON.
@@ -33,14 +34,14 @@ func Text(w io.Writer, r *engine.Report) error {
 		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 		fmt.Fprintln(tw, "  SEVERITY\tCONFIDENCE\tHOST\tPORT\tCHECK\tTITLE")
 		for _, f := range r.Findings {
-			fmt.Fprintf(tw, "  %s\t%s\t%s\t%d/%s\t%s\t%s\n", strings.ToUpper(f.Severity.String()), f.Confidence, f.Host, f.Port, f.Protocol, f.CheckID, f.Title)
+			fmt.Fprintf(tw, "  %s\t%s\t%s\t%d/%s\t%s\t%s\n", strings.ToUpper(f.Severity.String()), confidence(f), f.Host, f.Port, f.Protocol, f.CheckID, f.Title)
 		}
 		if err := tw.Flush(); err != nil {
 			return err
 		}
 		p.f("\nDetails:\n")
 		for _, f := range r.Findings {
-			p.f("  [%s] %s on %s:%d (%s)\n", strings.ToUpper(f.Severity.String()), f.Title, f.Host, f.Port, f.Confidence)
+			p.f("  [%s] %s on %s:%d (%s)\n", strings.ToUpper(f.Severity.String()), f.Title, f.Host, f.Port, confidence(f))
 			p.f("    Evidence: %s\n", f.Evidence)
 			p.f("    Fix: %s\n", f.Fix)
 		}
@@ -65,6 +66,14 @@ func (p *printer) f(format string, a ...any) {
 	if p.err == nil {
 		_, p.err = fmt.Fprintf(p.w, format, a...)
 	}
+}
+
+// confidence treats an empty value as confirmed, the same rule the engine uses.
+func confidence(f model.Finding) model.Confidence {
+	if f.Confidence == "" {
+		return model.Confirmed
+	}
+	return f.Confidence
 }
 
 func countServices(r *engine.Report) int {

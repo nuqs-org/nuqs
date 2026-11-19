@@ -104,3 +104,15 @@ func TestWriteErrors(t *testing.T) {
 		t.Error("JSON should return write errors")
 	}
 }
+
+func TestTextEmptyConfidence(t *testing.T) {
+	r := sample()
+	r.Findings[0].Confidence = ""
+	var b bytes.Buffer
+	if err := Text(&b, r); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(b.String(), "()") || !strings.Contains(b.String(), "(confirmed)") {
+		t.Errorf("an empty confidence should print as confirmed:\n%s", b.String())
+	}
+}
