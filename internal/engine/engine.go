@@ -136,6 +136,13 @@ func (e *Engine) Run(ctx context.Context, targets []string) (*Report, error) {
 	var mu sync.Mutex
 	e.runJobs(ctx, jobs, func(j job, res *check.Result, err error) {
 		in := j.c.Info()
+		conf := model.Confirmed
+		if err == nil && res != nil && res.Confidence != "" {
+			conf = res.Confidence
+			if !conf.Valid() {
+				res, err = nil, fmt.Errorf("check returned an unknown confidence %q", conf)
+			}
+		}
 		ev := Event{Kind: CheckDone, Host: j.t.Host, Port: j.t.Service.Port, CheckID: in.ID, Err: err}
 		mu.Lock()
 		switch {
@@ -143,15 +150,16 @@ func (e *Engine) Run(ctx context.Context, targets []string) (*Report, error) {
 			rep.Errors = append(rep.Errors, CheckError{CheckID: in.ID, Host: j.t.Host, Port: j.t.Service.Port, Error: err.Error()})
 		case res != nil:
 			rep.Findings = append(rep.Findings, model.Finding{
-				ID:       model.FindingID(j.t.Host, in.ID, j.t.Service.Port, j.t.Service.Protocol),
-				CheckID:  in.ID,
-				Title:    in.Title,
-				Severity: in.Severity,
-				Host:     j.t.Host,
-				Port:     j.t.Service.Port,
-				Protocol: j.t.Service.Protocol,
-				Evidence: res.Evidence,
-				Fix:      in.Fix,
+				ID:         model.FindingID(j.t.Host, in.ID, j.t.Service.Port, j.t.Service.Protocol),
+				CheckID:    in.ID,
+				Title:      in.Title,
+				Severity:   in.Severity,
+				Confidence: conf,
+				Host:       j.t.Host,
+				Port:       j.t.Service.Port,
+				Protocol:   j.t.Service.Protocol,
+				Evidence:   res.Evidence,
+				Fix:        in.Fix,
 			})
 		}
 		mu.Unlock()

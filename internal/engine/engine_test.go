@@ -78,7 +78,7 @@ func TestFindingsAndApplicability(t *testing.T) {
 	// Worst first: the medium telnet finding comes before the low web one.
 	f := rep.Findings[0]
 	want := model.Finding{
-		ID: "tel|10.0.0.2|23/tcp", CheckID: "tel", Title: "tel title", Severity: model.Medium,
+		ID: "tel|10.0.0.2|23/tcp", CheckID: "tel", Title: "tel title", Severity: model.Medium, Confidence: model.Confirmed,
 		Host: "10.0.0.2", Port: 23, Protocol: "tcp", Evidence: "telnet open", Fix: "tel fix",
 	}
 	if f != want {
@@ -301,5 +301,42 @@ func TestCompareAddr(t *testing.T) {
 	}
 	if compareAddr("10.0.0.1", "10.0.0.1") != 0 {
 		t.Error("equal addresses should compare equal")
+	}
+}
+
+func TestConfidence(t *testing.T) {
+	result := func(c model.Confidence) func(context.Context, check.Target) (*check.Result, error) {
+		return func(context.Context, check.Target) (*check.Result, error) {
+			return &check.Result{Evidence: "e", Confidence: c}, nil
+		}
+	}
+	cases := []struct {
+		name string
+		in   model.Confidence
+		want model.Confidence // empty means the result must become an error
+	}{
+		{"empty means confirmed", "", model.Confirmed},
+		{"confirmed", model.Confirmed, model.Confirmed},
+		{"inferred", model.Inferred, model.Inferred},
+		{"unknown", "maybe", ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			tel := newCheck("tel", model.Medium, []string{"telnet"}, result(c.in))
+			e := &Engine{Scanner: fakeScanner{hosts: twoHosts}, Checks: []check.Check{tel}}
+			rep, err := e.Run(context.Background(), []string{"10.0.0.2"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if c.want == "" {
+				if len(rep.Findings) != 0 || len(rep.Errors) != 1 || !strings.Contains(rep.Errors[0].Error, "unknown confidence") {
+					t.Fatalf("an unknown confidence must be an error, not a finding: %+v / %+v", rep.Findings, rep.Errors)
+				}
+				return
+			}
+			if len(rep.Findings) != 1 || rep.Findings[0].Confidence != c.want {
+				t.Fatalf("want one %s finding, got %+v", c.want, rep.Findings)
+			}
+		})
 	}
 }

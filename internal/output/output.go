@@ -31,16 +31,16 @@ func Text(w io.Writer, r *engine.Report) error {
 	} else {
 		p.f("Findings (%d):\n", len(r.Findings))
 		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(tw, "  SEVERITY\tHOST\tPORT\tCHECK\tTITLE")
+		fmt.Fprintln(tw, "  SEVERITY\tCONFIDENCE\tHOST\tPORT\tCHECK\tTITLE")
 		for _, f := range r.Findings {
-			fmt.Fprintf(tw, "  %s\t%s\t%d/%s\t%s\t%s\n", strings.ToUpper(f.Severity.String()), f.Host, f.Port, f.Protocol, f.CheckID, f.Title)
+			fmt.Fprintf(tw, "  %s\t%s\t%s\t%d/%s\t%s\t%s\n", strings.ToUpper(f.Severity.String()), f.Confidence, f.Host, f.Port, f.Protocol, f.CheckID, f.Title)
 		}
 		if err := tw.Flush(); err != nil {
 			return err
 		}
 		p.f("\nDetails:\n")
 		for _, f := range r.Findings {
-			p.f("  [%s] %s on %s:%d\n", strings.ToUpper(f.Severity.String()), f.Title, f.Host, f.Port)
+			p.f("  [%s] %s on %s:%d (%s)\n", strings.ToUpper(f.Severity.String()), f.Title, f.Host, f.Port, f.Confidence)
 			p.f("    Evidence: %s\n", f.Evidence)
 			p.f("    Fix: %s\n", f.Fix)
 		}

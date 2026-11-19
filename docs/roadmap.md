@@ -98,8 +98,8 @@ The docs site exports to one PDF for submission.
 - [ ] Every teammate builds Nuqs, scans their own router, and merges one PR
 - [ ] **Test lab:** `lab/docker-compose.yml` with real services: vsftpd with anonymous login, a Telnet server, nginx without headers, an old OpenSSH, a TLS 1.0 server, Redis and MongoDB with no login
 - [ ] Lab CI job: scan the lab, the result must match a saved expected report exactly
-- [ ] `internal/version`: compare versions like each ecosystem does (semver, Debian, RPM, OpenSSH style `9.6p1`)
-- [ ] `confidence` on every finding: `confirmed` (we proved it) or `inferred` (from the version)
+- [x] `internal/version`: compare versions like each ecosystem does (semver, Debian, RPM, OpenSSH style `9.6p1`)
+- [x] `confidence` on every finding: `confirmed` (we proved it) or `inferred` (from the version)
 - [ ] 5 checks: `tls-deprecated-protocols`, `ssh-password-auth`, `ssh-weak-algorithms`, `redis-no-auth`, `mongodb-no-auth`
 - [ ] **API and UI:** wireframes for every page (new scan, live scan, results, finding detail, history, diff)
 - [ ] **Docs:** background, survey, scope

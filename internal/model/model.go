@@ -60,6 +60,21 @@ func (s *Severity) UnmarshalText(b []byte) error {
 	return nil
 }
 
+// Confidence says how sure we are that a finding is real.
+type Confidence string
+
+// The two confidence levels.
+const (
+	// Confirmed means we saw the problem ourselves, like a login that worked.
+	Confirmed Confidence = "confirmed"
+	// Inferred means we only know it from a version number. Distros often
+	// patch old versions, so it may already be fixed.
+	Inferred Confidence = "inferred"
+)
+
+// Valid reports whether c is Confirmed or Inferred.
+func (c Confidence) Valid() bool { return c == Confirmed || c == Inferred }
+
 // Service is one open port on a host, plus whatever Nmap could tell about it.
 type Service struct {
 	Port     int    `json:"port"`
@@ -79,15 +94,16 @@ type Host struct {
 
 // Finding is one problem that a check found on a service.
 type Finding struct {
-	ID       string   `json:"id"`
-	CheckID  string   `json:"check_id"`
-	Title    string   `json:"title"`
-	Severity Severity `json:"severity"`
-	Host     string   `json:"host"`
-	Port     int      `json:"port"`
-	Protocol string   `json:"protocol"`
-	Evidence string   `json:"evidence"` // what we actually saw, so people can trust it
-	Fix      string   `json:"fix"`
+	ID         string     `json:"id"`
+	CheckID    string     `json:"check_id"`
+	Title      string     `json:"title"`
+	Severity   Severity   `json:"severity"`
+	Confidence Confidence `json:"confidence"`
+	Host       string     `json:"host"`
+	Port       int        `json:"port"`
+	Protocol   string     `json:"protocol"`
+	Evidence   string     `json:"evidence"` // what we actually saw, so people can trust it
+	Fix        string     `json:"fix"`
 }
 
 // FindingID builds a stable ID for a finding. The same problem on the same

@@ -69,7 +69,7 @@ func TestFindingID(t *testing.T) {
 }
 
 func TestFindingJSONShape(t *testing.T) {
-	f := Finding{ID: "x", CheckID: "c", Title: "t", Severity: High, Host: "h", Port: 1, Protocol: "tcp", Evidence: "e", Fix: "f"}
+	f := Finding{ID: "x", CheckID: "c", Title: "t", Severity: High, Confidence: Inferred, Host: "h", Port: 1, Protocol: "tcp", Evidence: "e", Fix: "f"}
 	b, err := json.Marshal(f)
 	if err != nil {
 		t.Fatal(err)
@@ -78,12 +78,25 @@ func TestFindingJSONShape(t *testing.T) {
 	if err := json.Unmarshal(b, &m); err != nil {
 		t.Fatal(err)
 	}
-	for _, k := range []string{"id", "check_id", "title", "severity", "host", "port", "protocol", "evidence", "fix"} {
+	for _, k := range []string{"id", "check_id", "title", "severity", "confidence", "host", "port", "protocol", "evidence", "fix"} {
 		if _, ok := m[k]; !ok {
 			t.Errorf("JSON is missing %q", k)
 		}
 	}
 	if m["severity"] != "high" {
 		t.Errorf("severity should be a name, got %v", m["severity"])
+	}
+}
+
+func TestConfidenceValid(t *testing.T) {
+	for _, c := range []Confidence{Confirmed, Inferred} {
+		if !c.Valid() {
+			t.Errorf("%q should be valid", c)
+		}
+	}
+	for _, c := range []Confidence{"", "maybe", "Confirmed"} {
+		if c.Valid() {
+			t.Errorf("%q should not be valid", c)
+		}
 	}
 }

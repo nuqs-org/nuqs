@@ -84,6 +84,7 @@ If you forget step 2 or 3, `checks/checks_test.go` fails and tells you.
 
 - **Be safe.** Never change anything on the target, never send exploits. Read only.
 - **Return evidence.** Say what you saw in plain words, like "sent PING without a password and got +PONG".
+- **Say how sure you are.** If you saw the problem yourself (a login worked, a header is missing), leave `Confidence` empty, it counts as `confirmed`. If you only know it from a version number, set `Confidence: model.Inferred`, because distros often patch old versions.
 - **Errors aren't findings.** If you couldn't check, return an error. Only return a Result when you're sure.
 - **Respect ctx.** Use `DialContext` and set deadlines. The engine uses ctx for timeouts.
 - **Limit reads.** Never read an unlimited amount from a server, a hostile one can send gigabytes.

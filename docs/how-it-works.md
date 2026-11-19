@@ -24,4 +24,5 @@ See [Architecture](architecture.md). It shows every package, what it does, what 
 - **Standard library only** for now, zero dependencies. Less to audit, less to break.
 - **Errors aren't findings.** A check that couldn't connect never reports "vulnerable".
 - **Evidence for everything.** Every finding says what we saw, so people can trust it.
+- **Confidence for everything.** Every finding is `confirmed` (we saw it happen) or `inferred` (only from a version number).
 - **Same input, same output.** Reports are sorted the same way every time.
