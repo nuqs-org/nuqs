@@ -64,6 +64,8 @@ jobs:
           - { pkg: ./internal/target, fn: FuzzParse }
           - { pkg: ./internal/nmap, fn: FuzzParse }
           - { pkg: ./internal/version, fn: FuzzCompare }
+          - { pkg: ./internal/sshprobe, fn: FuzzReadPacket }
+          - { pkg: ./checks/mongodbnoauth, fn: FuzzReply }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -88,7 +90,7 @@ jobs:
   lab:
     name: Lab
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -97,6 +99,15 @@ jobs:
       - name: Install Nmap
         run: sudo apt-get update && sudo apt-get install -y nmap
       - run: ./scripts/lab.sh
+        env:
+          LAB_OUT: lab-report.json
+      # When the report changes, download this, check it, and commit it as lab/expected-report.json.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: lab-report
+          path: lab-report.json
+          if-no-files-found: ignore
 
   build:
     name: Build and smoke test

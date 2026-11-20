@@ -7,7 +7,7 @@ It is designed to be simple to use, feature-rich and reliable. Every finding inc
 ## What it does today
 
 - Finds hosts and open services with Nmap
-- Runs 4 checks: open Telnet, missing web security headers, anonymous FTP login, Redis with no password
+- Runs 8 checks: open Telnet, missing web security headers, anonymous FTP login, Redis and MongoDB with no password, SSH password login, weak SSH algorithms, old TLS versions
 - Shows every finding with **evidence** (what we actually saw) and a **fix**
 - Prints a readable report or JSON
 
