@@ -50,7 +50,8 @@ type Result struct {
 
 	// Confidence is how sure the check is. Leave it empty when the check saw
 	// the problem itself, that counts as model.Confirmed. Set model.Inferred
-	// when the finding comes only from a version number.
+	// when the finding comes only from a version number or from Nmap guessing
+	// the service from the port.
 	Confidence model.Confidence
 }
 

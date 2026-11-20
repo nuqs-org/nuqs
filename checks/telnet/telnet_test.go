@@ -55,7 +55,10 @@ func TestRunGuessed(t *testing.T) {
 }
 
 func TestRunProbedIsConfirmed(t *testing.T) {
-	res, _ := Check{}.Run(context.Background(), check.Target{Host: "10.0.0.1", Service: model.Service{Port: 23, Protocol: "tcp", Name: "telnet"}})
+	res, err := Check{}.Run(context.Background(), check.Target{Host: "10.0.0.1", Service: model.Service{Port: 23, Protocol: "tcp", Name: "telnet"}})
+	if err != nil || res == nil {
+		t.Fatalf("expected a finding, got %v, %v", res, err)
+	}
 	if res.Confidence != "" {
 		t.Errorf("a probed service should leave confidence empty (confirmed), got %q", res.Confidence)
 	}

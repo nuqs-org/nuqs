@@ -67,8 +67,8 @@ type Confidence string
 const (
 	// Confirmed means we saw the problem ourselves, like a login that worked.
 	Confirmed Confidence = "confirmed"
-	// Inferred means we only know it from a version number. Distros often
-	// patch old versions, so it may already be fixed.
+	// Inferred means we only know it from a version number, or Nmap only
+	// guessed the service from the port. Either way it may not be real.
 	Inferred Confidence = "inferred"
 )
 
