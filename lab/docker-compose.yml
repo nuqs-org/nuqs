@@ -33,6 +33,8 @@ services:
       retries: 20
   ftp:
     build: ./ftp
+    # vsftpd segfaults when it runs as PID 1 and quick connections close, so run it under an init.
+    init: true
     read_only: true
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
