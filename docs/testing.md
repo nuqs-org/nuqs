@@ -32,7 +32,7 @@ pinned images and the Alpine vsftpd package. Keep these loopback ports free.
 | Service | Port | Expected finding |
 | --- | --- | --- |
 | vsftpd | 12121 | Medium. The empty public service accepts the anonymous handshake and prohibits file transfers. |
-| BusyBox telnetd | 12323 | Medium. The listener negotiates Telnet and closes the session without starting a shell. |
+| BusyBox telnetd | 12323 | Medium. The listener negotiates Telnet and echoes input back with `cat`, no shell. |
 | nginx | 18080 | Low. The static page omits the three HTTP security headers checked by Nuqs. |
 
 Nuqs uses real Nmap discovery and its built-in check registry. Expect three

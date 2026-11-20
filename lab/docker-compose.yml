@@ -20,7 +20,9 @@ services:
       retries: 20
   telnet:
     image: busybox:1.37.0@sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec
-    command: ["telnetd", "-F", "-p", "2323", "-l", "/bin/true"]
+    # cat keeps the session open until the client leaves, so Nmap always gets the
+    # full Telnet handshake and names BusyBox the same way every run. No shell.
+    command: ["telnetd", "-F", "-p", "2323", "-l", "/bin/cat"]
     user: "65534:65534"
     read_only: true
     cap_drop: [ALL]
