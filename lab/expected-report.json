@@ -142,14 +142,14 @@
           "protocol": "tcp",
           "name": "mongodb",
           "product": "MongoDB",
-          "version": "8.0.0"
+          "version": "3.6 after 3.6.3, or 3.7.3 or later"
         },
         {
           "port": 16379,
           "protocol": "tcp",
           "name": "redis",
           "product": "Redis key-value store",
-          "version": "7.4.0"
+          "version": "7.4.12"
         },
         {
           "port": 18080,

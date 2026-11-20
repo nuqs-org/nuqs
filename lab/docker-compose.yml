@@ -76,8 +76,8 @@ services:
       timeout: 2s
       retries: 20
   redis:
-    # Pin this to a digest after the first run: docker inspect --format '{{index .RepoDigests 0}}' redis:7.4-alpine
-    image: redis:7.4-alpine
+    # The exact version, so the version Nmap reports doesn't change under us.
+    image: redis:7.4.12-alpine
     command: ["redis-server", "--protected-mode", "no", "--save", "", "--appendonly", "no"]
     read_only: true
     security_opt: ["no-new-privileges:true"]
