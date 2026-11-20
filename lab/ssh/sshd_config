@@ -1,0 +1,14 @@
+# Offers password login and two weak algorithms, but nobody can actually log in.
+Port 2222
+PidFile none
+HostKey /etc/ssh/ssh_host_ed25519_key
+HostKey /etc/ssh/ssh_host_rsa_key
+PasswordAuthentication yes
+KbdInteractiveAuthentication no
+PermitRootLogin no
+# No such user, so every login fails even with the right password.
+AllowUsers nobody-can-log-in
+KexAlgorithms +diffie-hellman-group14-sha1
+Ciphers +aes128-cbc
+# Nmap and the checks connect and leave without logging in, don't block them for it.
+PerSourcePenalties no

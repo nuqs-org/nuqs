@@ -1,4 +1,4 @@
-# Runs the three loopback services for the Nuqs report test.
+# Runs the loopback services for the Nuqs report test, one or more per check.
 services:
   web:
     image: nginx:stable-alpine@sha256:3bc3836dc0be3b811f238210360bf8e7ca8a2d0effdae46160bf1f3578710051
@@ -45,3 +45,61 @@ services:
       interval: 1s
       timeout: 2s
       retries: 15
+  ssh:
+    build: ./ssh
+    init: true
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    ports: ["127.0.0.1:12222:2222"]
+    healthcheck:
+      test: ["CMD-SHELL", "netstat -lnt | grep -q ':2222 '"]
+      interval: 1s
+      timeout: 2s
+      retries: 20
+  tls:
+    image: nginx:stable-alpine@sha256:3bc3836dc0be3b811f238210360bf8e7ca8a2d0effdae46160bf1f3578710051
+    entrypoint: ["nginx", "-g", "daemon off;"]
+    user: "65534:65534"
+    read_only: true
+    cap_drop: [ALL]
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./nginx-tls.conf:/etc/nginx/nginx.conf:ro
+      - ./index.html:/www/index.html:ro
+      # scripts/lab.sh makes a throwaway certificate for each run.
+      - ${LAB_TLS_DIR:?run scripts/lab.sh, it makes the certificate}:/tls:ro
+    ports: ["127.0.0.1:18443:8443"]
+    healthcheck:
+      test: ["CMD-SHELL", "netstat -lnt | grep -q ':8443 '"]
+      interval: 1s
+      timeout: 2s
+      retries: 20
+  redis:
+    # The exact version, so the version Nmap reports doesn't change under us.
+    image: redis:7.4.12-alpine
+    command: ["redis-server", "--protected-mode", "no", "--save", "", "--appendonly", "no"]
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /data
+    ports: ["127.0.0.1:16379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 2s
+      retries: 20
+  mongodb:
+    # Pin this to a digest after the first run: docker inspect --format '{{index .RepoDigests 0}}' mongo:8.0
+    image: mongo:8.0
+    # Not read-only: the image's start script and mongosh write to their home folders.
+    tmpfs:
+      - /data/db
+      - /data/configdb
+      - /tmp
+    ports: ["127.0.0.1:12717:27017"]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ping: 1}).ok"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
