@@ -42,7 +42,7 @@ nav [aria-current] {background:var(--selected);color:var(--accent)}
 main {margin-left:var(--sidebar);padding:24px var(--gutter) 52px}
 main>section {max-width:1360px;margin-inline:auto}
 .workgrid {border-radius:19px;overflow:hidden;background:#232323;color:#f8f8f8;border:1px solid #5e5e5e}
-.launch {padding:clamp(22px,3vw,40px) 16px 18px;text-align:center;background:transparent}
+.launch {--launch-inset:16px;padding:clamp(22px,3vw,40px) var(--launch-inset) 18px;text-align:center;background:transparent}
 .launch h1 {font-size:clamp(38px,4vw,58px);letter-spacing:-.06em;font-weight:620;margin-bottom:17px}
 fieldset {min-width:0;margin:0;border:0;padding:0}
 .targetEntry {width:min(365px,100%);margin:auto;text-align:left}
@@ -57,7 +57,8 @@ input:not([type=checkbox]) {display:block;width:100%;min-width:0;border-radius:8
 .scanOrb::after {content:"";position:absolute;inset:-6px;border:1px solid #dddddd77;border-radius:50%;pointer-events:none}
 .scanOrb svg {width:27px;height:27px}
 .scanOrb:disabled::after {border-top:2px solid #f1f1f1}
-.launch details {width:min(600px,100%);margin-inline:auto}
+.launch details {margin-inline:calc(-1 * var(--launch-inset))}
+#scanPage:not(.running) .launch:has(details[open]) {padding-bottom:0}
 .launch summary {
   display:flex;align-items:center;gap:9px;width:fit-content;min-height:34px;
   margin:auto;padding:4px 14px;color:var(--text);font-size:13px;font-weight:600;
@@ -69,7 +70,11 @@ input:not([type=checkbox]) {display:block;width:100%;min-width:0;border-radius:8
   border-width:0 1.5px 1.5px 0;transform:rotate(45deg)
 }
 .launch details[open] summary::after {margin-top:3px;transform:rotate(225deg)}
-.options {text-align:left;margin-top:16px;padding:16px 0 0;border-top:1px solid var(--line)}
+.options {
+  text-align:left;margin-top:16px;padding:clamp(16px,2.5vw,32px);
+  background:#414141;border-top:1px solid var(--glass-edge)
+}
+.light .options {background:#ededed}
 .optionFields {display:grid;grid-template-columns:minmax(0,1.4fr) repeat(2,minmax(0,1fr));gap:14px}
 .optionFields input:not([type=checkbox]) {margin-top:5px;font:14px/1.4 var(--mono);background:var(--field);color:var(--text)}
 .optionFields input::placeholder {color:var(--sub)}
@@ -112,7 +117,7 @@ pre {white-space:pre-wrap;overflow-wrap:anywhere;background:var(--panel);padding
 @media(max-width:740px){
   .top {display:none}
   main {padding:14px 12px 36px}.referenceGrid {grid-template-columns:1fr;gap:12px}
-  .launch {padding:20px 14px 14px}.launch h1 {margin-bottom:12px}.scanOrb {width:102px;height:102px;margin:17px auto 14px}
+  .launch {--launch-inset:14px;padding:20px var(--launch-inset) 14px}.launch h1 {margin-bottom:12px}.scanOrb {width:102px;height:102px;margin:17px auto 14px}
 }
 @media(prefers-reduced-motion:no-preference){
   .scanOrb {transition:transform 130ms ease-out}.scanOrb:enabled:active {transform:scale(.96)}
