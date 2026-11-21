@@ -297,7 +297,7 @@ func toProgress(e xml.StartElement) (Progress, bool) {
 		}
 	}
 	f, err := strconv.ParseFloat(pct, 64)
-	if p.Task == "" || err != nil || f < 0 || f > 100 {
+	if p.Task == "" || err != nil || !(f >= 0 && f <= 100) { // also catches NaN, which JSON can't encode
 		return Progress{}, false
 	}
 	p.Percent = f

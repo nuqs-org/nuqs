@@ -307,6 +307,7 @@ func TestStreamProgress(t *testing.T) {
 		`<taskprogress task="Connect Scan" percent="lots"/>`, // skipped
 		`<taskprogress percent="5"/>`,                        // no task, skipped
 		`<taskprogress task="Connect Scan" percent="140"/>`,  // skipped
+		`<taskprogress task="Connect Scan" percent="NaN"/>`,  // skipped, JSON can't encode it
 		`</nmaprun>`,
 	}}
 	err := Scanner{Runner: r}.Stream(context.Background(), []string{"x"}, Events{Progress: func(p Progress) { ps = append(ps, p) }})
