@@ -316,7 +316,7 @@ body {accent-color:var(--text)}
   @media(prefers-reduced-motion:no-preference) and (prefers-contrast:no-preference) and (prefers-reduced-transparency:no-preference){
     :is(.rail,.workgrid,.top,.toolbar)::after {
       content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;padding:2px;
-      background:radial-gradient(180px circle at var(--reflection-x,12%) var(--reflection-y,0%),#fff,transparent);
+      background:radial-gradient(180px circle at var(--reflection-x,12%) var(--reflection-y,0%),#fffffff0,transparent);
       mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;
     }
   }
@@ -327,7 +327,7 @@ body {accent-color:var(--text)}
 @supports (mask-composite:exclude) {
   :is(.rail,.top,.workgrid,.profile,#inventory,article,dialog,.toolbar,.options)::before {
     content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;padding:3px;
-    background:conic-gradient(from 28deg,transparent 7%,#fff9 17%,#0003 31%,transparent 43%,#fffa 62%,#0002 79%,#fff9 90%,transparent);
+    background:conic-gradient(from 28deg,transparent 7%,#fff8 17%,#0003 31%,transparent 43%,#fff9 62%,#0002 79%,#fff8 90%,transparent);
     mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;
     -webkit-backdrop-filter:contrast(1.12);backdrop-filter:contrast(1.12);
   }
