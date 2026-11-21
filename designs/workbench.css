@@ -31,7 +31,8 @@ small,.endpoint,#metadata {color:var(--sub)}
 .connection,.localAddress {font:11px/1.5 var(--mono);color:var(--sub)}
 .connection {margin:13px 12px 32px}
 .connection::before {content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--sub);margin-right:6px}
-.connection.ready::before {background:#a9a9a9}
+.connection.ready::before {background:#41c77a}
+.light .connection.ready::before {background:#16834c}
 nav {display:grid;gap:5px}
 nav button {border:1px solid transparent;background:none;display:flex;align-items:center;gap:10px;text-align:left;color:var(--sub);font-size:14px;min-height:42px}
 nav [aria-current] {background:var(--selected);color:var(--accent)}
@@ -355,5 +356,26 @@ body {accent-color:var(--text)}
   :is(.rail,.top,.workgrid,.profile,#inventory,article,dialog,.toolbar,.options)::before {display:none}
   :is(.rail,.top,dialog,#raw,#backScan,#openLibrary,#displayName,.searchLabel input,.targetEntry input,.optionFields input:not([type=checkbox]),.badge:not(.high,.critical),.scanFeedback:has(#scanPhase:not(:empty))) {
     background:var(--panel);box-shadow:none
+  }
+}
+
+/* Clear optical surface around the editable target, with a separate text layer. */
+.targetLens {position:relative;border-radius:15px;margin:5px 0}
+.targetLens input {margin:0;border-radius:inherit}
+@media(prefers-reduced-transparency:no-preference) and (prefers-contrast:no-preference){
+  .workgrid {background-image:radial-gradient(ellipse at 8% 0%,var(--glass-shine),transparent 48%),
+    linear-gradient(155deg,transparent 52%,#ffffff0c 71%,transparent 86%)}
+  .targetLens input {
+    border-color:var(--liquid-rim);
+    background:linear-gradient(174deg,#ffffff28,transparent 46%,#ffffff0d 82%,#ffffff26),var(--liquid-fill);
+    box-shadow:inset 0 1px 1px var(--liquid-light),inset 0 -2px 3px #0002,0 2px 6px var(--liquid-shadow);
+  }
+  @supports(mask-composite:exclude){
+    .targetLens::before {
+      content:"";position:absolute;inset:0;border-radius:inherit;padding:1.5px;pointer-events:none;
+      background:linear-gradient(135deg,#ffffffb0,transparent 33%,#0002 65%,#ffffff8c);
+      mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;
+      backdrop-filter:url("#liquid-rim") contrast(1.08);
+    }
   }
 }
