@@ -15,10 +15,11 @@ library and latest report. The scan profile reflects current form values and the
 registered-check inventory comes from the engine. On narrow screens navigation
 moves above the workspace and the profile sits below scan configuration.
 
-The web treatment of Liquid Glass uses floating navigation, translucent surfaces
-and a local CSS wallpaper. Text-heavy report surfaces remain opaque. Browsers
-without backdrop filtering receive a solid navigation surface. Increased contrast
-and reduced transparency preferences also remove the wallpaper ribbons and blur.
+The launch surface uses local optical-glass artwork and a mint circular control.
+The profile and registered checks share a row below it on wide screens. Use
+solid backgrounds for navigation, reports and supporting data. Increased
+contrast and reduced transparency preferences replace the artwork and control
+reflections with solid colors.
 
 New scan anchors the console. Align the target field, circular submit control
 and options disclosure on a shared centerline. Show the busy label and ring
