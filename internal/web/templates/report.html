@@ -1,5 +1,5 @@
 <!-- Server-rendered scan report fragment (auto-escaped by html/template). -->
-<p id="status" role="status">{{.StatusLine}}</p>
+<p id="status" class="statusPill {{.StatusClass}}" role="status">{{.StatusLine}}</p>
 <p id="metadata">{{.MetadataLine}}</p>
 <div id="counts">{{range .Counts}}<span class="badge {{.Class}}">{{.Count}} {{.Level}}</span>{{end}}</div>
 <div class="toolbar">

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os/exec"
 	"slices"
 	"strings"
 	"testing"
@@ -203,6 +204,17 @@ func TestScanStreamsErrorWhenDiscoveryFails(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), `"type":"error"`) || !strings.Contains(w.Body.String(), "nmap unavailable") {
 		t.Fatalf("expected SSE error event, got: %s", w.Body.String())
+	}
+
+	// Missing Nmap should translate into a friendly install hint.
+	h2 := newTestHandler(&fakeRunner{err: exec.ErrNotFound})
+	r2 := httptest.NewRequest(http.MethodPost, "http://"+host+"/api/scan", strings.NewReader(`{"target":"127.0.0.1","top_ports":100,"light_version":true}`))
+	r2.Header.Set("Origin", "http://"+host)
+	r2.Header.Set("Content-Type", "application/json")
+	w2 := httptest.NewRecorder()
+	h2.ServeHTTP(w2, r2)
+	if !strings.Contains(w2.Body.String(), "Nmap isn't installed") {
+		t.Fatalf("expected friendly missing-nmap message, got: %s", w2.Body.String())
 	}
 }
 

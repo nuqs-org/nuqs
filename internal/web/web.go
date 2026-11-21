@@ -14,6 +14,7 @@ import (
 	"html/template"
 	"io/fs"
 	"net/http"
+	"net/netip"
 	"slices"
 	"strconv"
 	"strings"
@@ -108,11 +109,12 @@ func (h *Handler) LatestReport() (*engine.Report, string) {
 }
 
 type indexData struct {
-	Status    tools.Status
-	ScopeHint string
-	Checks    []tools.CheckInfo
-	HasReport bool
-	Report    reportView
+	Status          tools.Status
+	ScopeHint       string
+	SuggestedTarget string
+	Checks          []tools.CheckInfo
+	HasReport       bool
+	Report          reportView
 }
 
 type countBadge struct {
@@ -136,6 +138,7 @@ type reportView struct {
 	HasReport        bool
 	Restored         bool
 	StatusLine       string
+	StatusClass      string
 	MetadataLine     string
 	Counts           []countBadge
 	SelectedSeverity string
@@ -163,11 +166,12 @@ func (h *Handler) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	rep, msg := h.LatestReport()
 	data := indexData{
-		Status:    status,
-		ScopeHint: scopeHint,
-		Checks:    h.Service.ListChecks(),
-		HasReport: rep != nil,
-		Report:    buildReportView(rep, msg, "", true),
+		Status:          status,
+		ScopeHint:       scopeHint,
+		SuggestedTarget: suggestedTarget(h.Service.AllowedScope),
+		Checks:          h.Service.ListChecks(),
+		HasReport:       rep != nil,
+		Report:          buildReportView(rep, msg, "", true),
 	}
 	h.renderHTML(w, "index.html", data)
 }
@@ -227,15 +231,17 @@ func buildReportView(rep *engine.Report, message, selectedSeverity string, resto
 		duration = 0
 	}
 	incomplete := message != "" || len(rep.Errors) > 0
-	outcome := "Scan finished"
+	outcome := "Finished"
+	statusClass := "done"
 	if incomplete {
 		outcome = "Scan incomplete"
+		statusClass = "incomplete"
 	}
 	prefix := ""
 	if restored {
 		prefix = "Last report · "
 	}
-	statusLine := fmt.Sprintf("%s%s in %.2fs", prefix, outcome, duration)
+	statusLine := fmt.Sprintf("%s%s in %s", prefix, outcome, formatDuration(duration))
 
 	openServices := 0
 	for _, host := range rep.Hosts {
@@ -300,7 +306,7 @@ func buildReportView(rep *engine.Report, message, selectedSeverity string, resto
 	if selectedSeverity != "" {
 		emptyMessage = "No findings at this severity."
 	} else if len(rep.Hosts) == 0 {
-		emptyMessage = "No live hosts responded (try Skip host discovery if ping is blocked)."
+		emptyMessage = `No live hosts responded. Try enabling "Scan hosts even if they don't answer ping" in Scan options.`
 	}
 
 	rawBytes, _ := json.MarshalIndent(rep, "", "  ")
@@ -308,6 +314,7 @@ func buildReportView(rep *engine.Report, message, selectedSeverity string, resto
 		HasReport:        true,
 		Restored:         restored,
 		StatusLine:       statusLine,
+		StatusClass:      statusClass,
 		MetadataLine:     metadataLine,
 		Counts:           counts,
 		SelectedSeverity: selectedSeverity,
@@ -318,6 +325,27 @@ func buildReportView(rep *engine.Report, message, selectedSeverity string, resto
 		Message:          message,
 		Errors:           rep.Errors,
 	}
+}
+
+func formatDuration(seconds float64) string {
+	if seconds < 0 {
+		seconds = 0
+	}
+	if seconds > 0 && seconds < 0.1 {
+		return fmt.Sprintf("%.2fs", seconds)
+	}
+	return fmt.Sprintf("%.1fs", seconds)
+}
+
+func suggestedTarget(allowed []netip.Prefix) string {
+	if tools.TargetAllowed("127.0.0.1", allowed) {
+		return "127.0.0.1"
+	}
+	p := allowed[0]
+	if p.Bits() == p.Addr().BitLen() {
+		return p.Addr().String()
+	}
+	return p.String()
 }
 
 func badgeClass(level string) string {

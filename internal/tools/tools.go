@@ -7,8 +7,12 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/netip"
+	"os"
+	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -55,21 +59,25 @@ type Status struct {
 
 // ScanRequest holds raw scan parameters from the CLI, JSON API or web UI.
 type ScanRequest struct {
-	Target   string `json:"target"`
-	Ports    string `json:"ports"`
-	SkipPing bool   `json:"skip_ping"`
-	Force    bool   `json:"force"`
-	Workers  int    `json:"workers"`
-	Timeout  string `json:"timeout"`
+	Target       string `json:"target"`
+	Ports        string `json:"ports"`
+	TopPorts     int    `json:"top_ports,omitempty"`
+	LightVersion bool   `json:"light_version,omitempty"`
+	SkipPing     bool   `json:"skip_ping"`
+	Force        bool   `json:"force"`
+	Workers      int    `json:"workers"`
+	Timeout      string `json:"timeout"`
 }
 
 // ValidatedScan holds cleaned, checked scan settings ready to run.
 type ValidatedScan struct {
-	Targets  []string
-	Ports    string
-	SkipPing bool
-	Workers  int
-	Timeout  time.Duration
+	Targets      []string
+	Ports        string
+	TopPorts     int
+	LightVersion bool
+	SkipPing     bool
+	Workers      int
+	Timeout      time.Duration
 }
 
 // Service runs Nuqs actions using a shared scanner, check list and target policy.
@@ -171,13 +179,24 @@ func (s *Service) Status(addr string) Status {
 
 // ValidateScan checks targets, scope, ports, concurrency and timeout before starting a scan.
 func (s *Service) ValidateScan(req ScanRequest) (ValidatedScan, error) {
+	rawTarget := strings.TrimSpace(req.Target)
+	if rawTarget == "" {
+		return ValidatedScan{}, &ValidationError{Message: "Enter a target to scan, such as 127.0.0.1."}
+	}
 	limit := int64(target.DefaultLimit)
 	if req.Force {
 		limit = 0
 	}
-	targets, _, err := target.Parse([]string{strings.TrimSpace(req.Target)}, limit)
+	targets, _, err := target.Parse([]string{rawTarget}, limit)
 	if err != nil {
-		return ValidatedScan{}, &ValidationError{Message: fmt.Sprintf("invalid target: %v", err)}
+		if errors.Is(err, target.ErrTooMany) {
+			return ValidatedScan{}, &ValidationError{
+				Message: fmt.Sprintf("That target covers more than %d addresses. Turn on \"Allow large networks\" in Scan options to scan it anyway.", target.DefaultLimit),
+			}
+		}
+		return ValidatedScan{}, &ValidationError{
+			Message: fmt.Sprintf("Couldn't understand target (%v). Use an IP like 127.0.0.1, a CIDR like 192.168.1.0/24, a range like 192.168.1.1-20, or a hostname.", err),
+		}
 	}
 	if s.EnforceScope {
 		for i, spec := range targets {
@@ -188,17 +207,23 @@ func (s *Service) ValidateScan(req ScanRequest) (ValidatedScan, error) {
 			if !TargetAllowed(spec, s.AllowedScope) {
 				if len(s.AllowedScope) == 0 {
 					return ValidatedScan{}, &ValidationError{
-						Message: "Server scope allows IPv4 loopback targets only (127.0.0.0/8).",
+						Message: "This server only scans loopback targets (127.0.0.0/8) by default. To scan other networks, restart with: nuqs serve --allow 192.168.1.0/24",
 					}
 				}
 				return ValidatedScan{}, &ValidationError{
-					Message: fmt.Sprintf("Target %q is outside the allowed scope (%s).", spec, FormatAllowedScope(s.AllowedScope)),
+					Message: fmt.Sprintf("Target %q is outside the allowed scope (%s). Restart with --allow to expand it.", spec, FormatAllowedScope(s.AllowedScope)),
 				}
 			}
 		}
 	}
 
 	ports := strings.TrimSpace(req.Ports)
+	topPorts := req.TopPorts
+	if topPorts < 0 || topPorts > 65535 {
+		return ValidatedScan{}, &ValidationError{
+			Message: "Top ports must be between 1 and 65535.",
+		}
+	}
 	if ports != "" {
 		normalized, ok := NormalizePorts(ports)
 		if !ok {
@@ -207,6 +232,7 @@ func (s *Service) ValidateScan(req ScanRequest) (ValidatedScan, error) {
 			}
 		}
 		ports = normalized
+		topPorts = 0
 	}
 
 	workers := req.Workers
@@ -216,10 +242,10 @@ func (s *Service) ValidateScan(req ScanRequest) (ValidatedScan, error) {
 	if workers < 1 || (s.MaxWorkers > 0 && workers > s.MaxWorkers) {
 		if s.MaxWorkers > 0 {
 			return ValidatedScan{}, &ValidationError{
-				Message: fmt.Sprintf("Workers must be between 1 and %d.", s.MaxWorkers),
+				Message: fmt.Sprintf("Concurrent checks must be between 1 and %d.", s.MaxWorkers),
 			}
 		}
-		return ValidatedScan{}, &ValidationError{Message: "Workers must be at least 1."}
+		return ValidatedScan{}, &ValidationError{Message: "Concurrent checks must be at least 1."}
 	}
 
 	timeout := engine.DefaultCheckTimeout
@@ -227,17 +253,19 @@ func (s *Service) ValidateScan(req ScanRequest) (ValidatedScan, error) {
 		timeout, err = time.ParseDuration(req.Timeout)
 		if err != nil || timeout <= 0 {
 			return ValidatedScan{}, &ValidationError{
-				Message: "Enter a positive timeout with a unit, such as 30s.",
+				Message: "Enter a positive check timeout with a unit, such as 30s.",
 			}
 		}
 	}
 
 	return ValidatedScan{
-		Targets:  targets,
-		Ports:    ports,
-		SkipPing: req.SkipPing,
-		Workers:  workers,
-		Timeout:  timeout,
+		Targets:      targets,
+		Ports:        ports,
+		TopPorts:     topPorts,
+		LightVersion: req.LightVersion,
+		SkipPing:     req.SkipPing,
+		Workers:      workers,
+		Timeout:      timeout,
 	}, nil
 }
 
@@ -260,8 +288,10 @@ func (s *Service) RunValidated(ctx context.Context, scan ValidatedScan, onEvent 
 		Scanner: nmap.Scanner{
 			Runner: runner,
 			Options: nmap.Options{
-				Ports:    scan.Ports,
-				SkipPing: scan.SkipPing,
+				Ports:        scan.Ports,
+				TopPorts:     scan.TopPorts,
+				LightVersion: scan.LightVersion,
+				SkipPing:     scan.SkipPing,
 			},
 		},
 		Checks:       s.Checks(),
@@ -270,6 +300,62 @@ func (s *Service) RunValidated(ctx context.Context, scan ValidatedScan, onEvent 
 		OnEvent:      onEvent,
 	}
 	return eng.Run(ctx, scan.Targets)
+}
+
+// NmapInstallHint returns an OS-appropriate instruction for installing Nmap.
+func NmapInstallHint() string {
+	return nmapInstallHintFor(runtime.GOOS)
+}
+
+func nmapInstallHintFor(goos string) string {
+	switch goos {
+	case "darwin":
+		return "Install it with: brew install nmap"
+	case "windows":
+		return "Install it with: winget install Insecure.Nmap (or download from https://nmap.org/download.html)"
+	default:
+		return "Install it with your package manager (e.g. sudo apt install nmap or sudo dnf install nmap)"
+	}
+}
+
+// FriendlyError turns low-level engine and Nmap errors into plain, actionable messages.
+func FriendlyError(err error) string {
+	if err == nil {
+		return ""
+	}
+	var valErr *ValidationError
+	if errors.As(err, &valErr) {
+		return valErr.Message
+	}
+	if errors.Is(err, context.Canceled) {
+		return "Scan stopped before finishing."
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "Scan timed out before finishing."
+	}
+	msg := strings.TrimSpace(err.Error())
+	lower := strings.ToLower(msg)
+	if errors.Is(err, exec.ErrNotFound) || errors.Is(err, os.ErrNotExist) ||
+		strings.Contains(lower, "executable file not found") ||
+		strings.Contains(lower, "command not found") ||
+		strings.Contains(lower, "cannot find the file") ||
+		strings.Contains(lower, "no such file or directory") {
+		return fmt.Sprintf("Nmap isn't installed or couldn't be found. %s, or pass --nmap /path/to/nmap.", NmapInstallHint())
+	}
+	if errors.Is(err, os.ErrPermission) ||
+		strings.Contains(lower, "permission denied") ||
+		strings.Contains(lower, "operation not permitted") ||
+		strings.Contains(lower, "requires root") {
+		return "Permission denied while running Nmap. Make sure the nmap binary is executable and you have permission to scan this target."
+	}
+	if strings.Contains(lower, "failed to resolve") {
+		return "Couldn't resolve that target hostname. Check the spelling or enter an IP address like 127.0.0.1."
+	}
+	if strings.Contains(lower, "reading nmap xml") {
+		return "Nmap stopped unexpectedly and didn't return a complete result. Try running the scan again."
+	}
+	msg = strings.TrimPrefix(msg, "discovery failed: ")
+	return msg
 }
 
 // NormalizePorts validates and strips spaces from comma-separated TCP/UDP port

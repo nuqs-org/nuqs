@@ -274,7 +274,8 @@ func TestServeCommand(t *testing.T) {
 	t.Run("fails cleanly when nmap is missing or server errors", func(t *testing.T) {
 		app, _, errOut := newApp(t, &fakeRunner{})
 		app.LookPath = func(string) (string, error) { return "", errors.New("not found") }
-		if code := app.Run(context.Background(), []string{"serve"}); code != ExitError || !strings.Contains(errOut.String(), "cannot find Nmap") {
+		if code := app.Run(context.Background(), []string{"serve"}); code != ExitError ||
+			!strings.Contains(errOut.String(), "Nmap isn't installed") || !strings.Contains(errOut.String(), "--nmap") {
 			t.Fatalf("missing nmap: code=%d stderr=%s", code, errOut)
 		}
 

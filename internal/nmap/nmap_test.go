@@ -36,6 +36,21 @@ func TestArgs(t *testing.T) {
 	if dash < 0 || got[dash+1] != "10.0.0.1" || dash != len(got)-2 {
 		t.Errorf("targets must follow --: %q", got)
 	}
+
+	got = Args([]string{"10.0.0.1"}, Options{TopPorts: 100, LightVersion: true})
+	if !slices.Contains(got, "--version-light") {
+		t.Errorf("LightVersion should add --version-light: %q", got)
+	}
+	tp := slices.Index(got, "--top-ports")
+	if tp < 0 || got[tp+1] != "100" {
+		t.Errorf("TopPorts not passed: %q", got)
+	}
+
+	// Explicit Ports takes precedence over TopPorts so Nmap never gets both.
+	got = Args([]string{"10.0.0.1"}, Options{Ports: "80,443", TopPorts: 100})
+	if slices.Contains(got, "--top-ports") || !slices.Contains(got, "-p") {
+		t.Errorf("Ports should override TopPorts: %q", got)
+	}
 }
 
 func TestParseFixture(t *testing.T) {

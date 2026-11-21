@@ -45,6 +45,13 @@ main>section {max-width:1360px;margin-inline:auto}
 .workgrid {border-radius:19px;overflow:hidden;background:#232323;color:#f8f8f8;border:1px solid #5e5e5e}
 .launch {--launch-inset:16px;padding:clamp(22px,3vw,40px) var(--launch-inset) 18px;text-align:center;background:transparent}
 .launch h1 {font-size:clamp(38px,4vw,58px);letter-spacing:-.06em;font-weight:620;margin-bottom:17px}
+.presetGallery {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;width:min(680px,100%);margin:0 auto 20px;padding-inline:var(--launch-inset);text-align:left}
+.presetCard {display:grid;gap:3px;align-content:start;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--panel);color:var(--text);text-align:left}
+.presetCard:hover:enabled {border-color:var(--accent)}
+.presetCard[aria-pressed="true"] {border-color:var(--text);background:var(--selected)}
+.presetName {font-size:14px;font-weight:650}
+.presetDesc {font-size:12px;line-height:1.35;color:var(--sub)}
+@media(max-width:640px){.presetGallery {grid-template-columns:1fr;gap:8px}}
 fieldset {min-width:0;margin:0;border:0;padding:0}
 .targetEntry {width:min(365px,100%);margin:auto;text-align:left}
 .targetEntry label,.options label,.searchLabel {display:block;font-size:13px;font-weight:550}
@@ -58,37 +65,60 @@ input:not([type=checkbox]) {display:block;width:100%;min-width:0;border-radius:8
 .scanOrb::after {content:"";position:absolute;inset:-6px;border:1px solid #dddddd77;border-radius:50%;pointer-events:none}
 .scanOrb svg {width:27px;height:27px}
 .scanOrb:disabled::after {border-top:2px solid #f1f1f1}
-.launch summary {
+#scanOptions > summary {
   display:flex;align-items:center;gap:9px;width:fit-content;min-height:34px;
   margin:auto;padding:4px 14px;color:var(--text);font-size:13px;font-weight:600;
   border:1px solid var(--line);border-radius:20px;background:var(--panel);list-style:none
 }
-.launch summary::-webkit-details-marker {display:none}
-.launch summary::after {
+#scanOptions > summary::-webkit-details-marker {display:none}
+#scanOptions > summary::after {
   content:"";width:6px;height:6px;margin-top:-3px;border:solid currentColor;
   border-width:0 1.5px 1.5px 0;transform:rotate(45deg)
 }
-.launch details[open] summary::after {margin-top:3px;transform:rotate(225deg)}
+#scanOptions[open] > summary::after {margin-top:3px;transform:rotate(225deg)}
 .options {
   text-align:left;margin-top:16px;padding:clamp(16px,2.5vw,32px);
   background:#414141;border:1px solid var(--glass-edge);border-radius:12px
 }
 .light .options {background:#ededed}
-.optionFields {display:grid;grid-template-columns:minmax(0,1.4fr) repeat(2,minmax(0,1fr));gap:14px}
-.optionFields input:not([type=checkbox]) {margin-top:5px;font:14px/1.4 var(--mono);background:var(--field);color:var(--text)}
-.optionFields input::placeholder {color:var(--sub)}
+.optionFields {display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.optionFields :is(input:not([type=checkbox]),select),.advancedFields input:not([type=checkbox]) {margin-top:5px;width:100%;font:14px/1.4 var(--mono);background:var(--field);color:var(--text);border-radius:8px;border:1px solid var(--line);padding:9px 12px}
+.optionFields select {font-family:inherit}
+.optionFields input::placeholder,.advancedFields input::placeholder {color:var(--sub)}
 .optionFlags {margin-top:14px;border-top:1px solid var(--rule)}
-.optionFlags .option {display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;
-  min-height:40px;gap:10px;cursor:pointer;color:var(--text);font-size:14px;font-weight:450}
+.optionFlags .option {display:grid;grid-template-columns:auto minmax(0,1fr);align-items:start;
+  padding:10px 0;gap:10px;cursor:pointer;color:var(--text);font-size:14px;font-weight:450}
 .optionFlags .option + .option {border-top:1px solid var(--rule)}
-.optionFlags input {margin:0;width:16px;height:16px;cursor:pointer}
-.optionFlags code {font:12px var(--mono);color:var(--sub);white-space:nowrap}
-@media(max-width:620px){.optionFields {grid-template-columns:1fr;gap:10px}}
+.optionFlags input {margin:2px 0 0;width:16px;height:16px;cursor:pointer}
+.optionCopy {display:grid;gap:2px}
+.optionCopy strong {font-weight:550;font-size:14px}
+.optionCopy small {font-size:12px;color:var(--sub);line-height:1.4}
+.optionCopy code,.firstRun code,.emptyCard code {font:12px var(--mono);color:var(--text);background:var(--field);padding:1px 5px;border-radius:5px;border:1px solid var(--rule)}
+.advancedOptions {margin-top:14px;border-top:1px solid var(--rule);padding-top:10px}
+.advancedOptions > summary {display:inline-flex;align-items:center;gap:8px;width:fit-content;min-height:32px;margin:0;padding:4px 12px;color:var(--sub);font-size:13px;font-weight:600;border:1px solid var(--rule);border-radius:999px;background:var(--panel);list-style:none}
+.advancedOptions > summary::-webkit-details-marker {display:none}
+.advancedOptions > summary::after {content:"";width:5px;height:5px;margin-top:-2px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:rotate(45deg)}
+.advancedOptions[open] > summary::after {margin-top:2px;transform:rotate(225deg)}
+.advancedFields {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:12px}
+.fieldHint {display:block;margin-top:4px;font-size:12px;font-weight:400;color:var(--sub)}
+@media(max-width:620px){.optionFields,.advancedFields {grid-template-columns:1fr;gap:10px}}
 .scanFeedback {display:grid;justify-items:center;gap:6px}
-.scanFeedback:has(#scanPhase:not(:empty)) {margin-top:12px;background:#1f1f1fed;border-radius:12px;padding:10px;width:fit-content;max-width:100%;margin-inline:auto}
+.scanFeedback:has(#scanPhase:not(:empty)) {margin-top:12px;background:#1f1f1fed;border-radius:12px;padding:10px 14px;width:fit-content;max-width:100%;margin-inline:auto}
+#scanPhase.isError {color:var(--critical);font-weight:550}
 #elapsed,#activeTarget {font:13px var(--mono);overflow-wrap:anywhere}
 #stop {color:#f5f5f5;background:#3c3c3c;border-color:#878787}
-.running :is(.targetEntry,.launch details,.referenceGrid),.reportOnly :is(.workgrid,.referenceGrid) {display:none}
+.running :is(.presetGallery,.targetEntry,#scanOptions,.referenceGrid,#firstRun),.reportOnly :is(.workgrid,.referenceGrid,#firstRun) {display:none}
+.firstRun {margin-top:16px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--rule);border-radius:19px}
+.firstRunCopy {display:grid;gap:4px;min-width:0}
+.firstRunCopy p {color:var(--sub);font-size:14px}
+.tryScanBtn {border-radius:999px;padding:8px 16px;font-size:14px;font-weight:600;background:var(--text);color:var(--bg);border-color:var(--text);white-space:nowrap}
+.tryScanBtn:hover:enabled {opacity:.9;border-color:var(--text)}
+.emptyActions {display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.statusPill {display:inline-flex;align-items:center;gap:8px;font-weight:600}
+.statusPill::before {content:"";width:8px;height:8px;border-radius:50%;background:var(--sub);flex:none}
+.statusPill.done::before {background:#41c77a}
+.light .statusPill.done::before {background:#16834c}
+.statusPill.incomplete::before {background:var(--high)}
 .referenceGrid {margin-top:18px;display:grid;grid-template-columns:minmax(190px,.85fr) minmax(0,2.15fr);gap:16px;align-items:stretch}
 .profile,#inventory,article {background:var(--panel);border:1px solid var(--rule);border-radius:13px;overflow:hidden}
 .panelTitle,.heading,.toolbar {display:flex;align-items:center;gap:10px}
@@ -263,7 +293,7 @@ body {accent-color:var(--text)}
   --liquid-light:rgba(255,255,255,.72);
   --liquid-shadow:rgba(0,0,0,.14);
 }
-.rail,.workgrid,.profile,#inventory,article,dialog,.top,.toolbar {
+.rail,.workgrid,.profile,#inventory,.firstRun,article,dialog,.top,.toolbar {
   border:1px solid var(--liquid-rim);
   background-color:var(--liquid-fill);
   background-image:linear-gradient(154deg,#ffffff19 0%,transparent 20%,transparent 79%,#ffffff13 100%);
@@ -271,7 +301,17 @@ body {accent-color:var(--text)}
     0 8px 22px -9px var(--liquid-shadow);
 }
 .rail,.workgrid,dialog {border-radius:28px}
-.profile,#inventory,article {border-radius:19px}
+.profile,#inventory,.firstRun,article {border-radius:19px}
+.presetCard {
+  border:1px solid var(--liquid-rim);
+  background:linear-gradient(160deg,var(--glass-shine),transparent 58%),var(--liquid-fill);
+  box-shadow:inset 0 1px 1px var(--liquid-light),0 2px 6px var(--liquid-shadow);
+}
+.presetCard[aria-pressed="true"] {
+  border-color:var(--text);
+  background:linear-gradient(160deg,var(--glass-shine),transparent 55%),var(--liquid-control);
+  box-shadow:inset 0 1px 1px var(--liquid-light),0 3px 10px var(--liquid-shadow);
+}
 .top {
   position:sticky;top:10px;z-index:1;margin:12px var(--gutter) 0 calc(var(--rail-width) + var(--gutter));
   min-height:42px;padding:8px 18px;border-radius:24px;
@@ -307,9 +347,10 @@ body {accent-color:var(--text)}
   :is(.launch summary,.copy,#download,#stop,.dialogActions button):active {transform:scale(.97)}
 }
 @media(prefers-reduced-transparency:reduce),(prefers-contrast:more){
-  :is(.rail,.workgrid,.profile,#inventory,article,dialog,.top,.toolbar,.options,.launch summary,.toolbar button,.toolbar select,.copy,#download,#stop,.dialogActions button,#workspaceNav::before) {
+  :is(.rail,.workgrid,.profile,#inventory,.firstRun,.presetCard,article,dialog,.top,.toolbar,.options,.launch summary,.toolbar button,.toolbar select,.copy,#download,#stop,.dialogActions button,#workspaceNav::before) {
     background:var(--panel);border-color:var(--line);box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none
   }
+  .presetCard[aria-pressed="true"] {background:var(--selected);border-color:var(--text)}
   #workspaceNav [aria-current] {background:var(--selected);border-color:var(--accent)}
   .light .options {background:var(--panel)}
   .scanOrb,.scanOrb::after {box-shadow:none}
@@ -343,7 +384,7 @@ body {accent-color:var(--text)}
 }
 /* A denser neutral tint keeps text readable when a surface floats over content. */
 .rail,.top,dialog {background-color:color-mix(in srgb,var(--glass-base) 86%,transparent)}
-.targetEntry input,.optionFields input:not([type=checkbox]),.searchLabel input,#displayName,#raw {
+.targetEntry input,.optionFields :is(input:not([type=checkbox]),select),.advancedFields input:not([type=checkbox]),.searchLabel input,#displayName,#raw {
   background:linear-gradient(180deg,#0000000d,transparent 6px),var(--liquid-fill);
   border:1px solid var(--glass-edge);border-radius:12px;
   box-shadow:inset 0 1px 2px #0002,0 1px 1px #ffffff50;
@@ -357,22 +398,23 @@ body {accent-color:var(--text)}
 .checkRow.head {background:var(--liquid-fill)}
 @media(prefers-reduced-transparency:reduce),(prefers-contrast:more) {
   :is(.rail,.top,.workgrid,.profile,#inventory,article,dialog,.toolbar,.options)::before {display:none}
-  :is(.rail,.top,dialog,#raw,#backScan,#openLibrary,#displayName,.searchLabel input,.targetEntry input,.optionFields input:not([type=checkbox]),.badge:not(.high,.critical),.scanFeedback:has(#scanPhase:not(:empty))) {
+  :is(.rail,.top,dialog,#raw,#backScan,#openLibrary,#displayName,.searchLabel input,.targetEntry input,.optionFields :is(input:not([type=checkbox]),select),.advancedFields input:not([type=checkbox]),.badge:not(.high,.critical),.scanFeedback:has(#scanPhase:not(:empty))) {
     background:var(--panel);box-shadow:none
   }
 }
 
-/* Shared clear rim for text, number and search fields; the input stays interactive. */
+/* Shared clear rim for text, number, select and search fields; the control stays interactive. */
 .fieldLens {display:block;position:relative;border-radius:15px;margin:5px 0}
-.fieldLens input:not([type=checkbox]) {margin:0;border-radius:inherit}
+.fieldLens :is(input:not([type=checkbox]),select) {margin:0;border-radius:inherit}
 @media(prefers-reduced-transparency:no-preference) and (prefers-contrast:no-preference){
   .workgrid {background-image:radial-gradient(ellipse at 8% 0%,var(--glass-shine),transparent 48%),
     linear-gradient(155deg,transparent 52%,#ffffff0c 71%,transparent 86%)}
-  .fieldLens input:not([type=checkbox]) {
+  .fieldLens :is(input:not([type=checkbox]),select) {
     border-color:var(--liquid-rim);
     background:linear-gradient(174deg,#ffffff28,transparent 46%,#ffffff0d 82%,#ffffff26),var(--liquid-fill);
     box-shadow:inset 0 1px 1px var(--liquid-light),inset 0 -2px 3px #0002,0 2px 6px var(--liquid-shadow);
   }
+  .fieldLens select option {background:var(--panel);color:var(--text)}
   @supports(mask-composite:exclude){
     .fieldLens::before {
       content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;
@@ -406,8 +448,9 @@ main:has(> #scanPage:not([hidden],.reportOnly)) {
   width:100%;display:flex;flex-direction:column;
 }
 #scanPage .referenceGrid {flex:1}
-#scanPage:has(.launch details[open]) .referenceGrid {display:none}
-#scanPage:has(.launch details[open]) .workgrid,
+#scanPage:has(#scanOptions[open]) .referenceGrid,
+#scanPage:has(#scanOptions[open]) #firstRun {display:none}
+#scanPage:has(#scanOptions[open]) .workgrid,
 #scanPage.running .workgrid {flex:1}
 
 /* The disclosure spans the launch card; settings keep their own inset surface. */
@@ -418,16 +461,16 @@ main:has(> #scanPage:not([hidden],.reportOnly)) {
 .scanStage {min-width:0;padding-inline:var(--launch-inset)}
 #scanPage:not(.running) .scanStage {flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .scanStage .targetEntry {margin:0 auto}
-.launch details {
+#scanOptions {
   border-top:1px solid var(--rule);
   background:linear-gradient(180deg,var(--glass-shine),transparent 12px),var(--liquid-fill)
 }
-.launch details summary {
+#scanOptions > summary {
   width:100%;min-height:44px;justify-content:center;margin:0;
   border:0;border-radius:0;background:transparent;box-shadow:none
 }
-.launch details summary:focus-visible {outline-offset:-4px}
-.launch details[open] .options {margin:0 var(--launch-inset) var(--launch-inset)}
+#scanOptions > summary:focus-visible {outline-offset:-4px}
+#scanOptions[open] .options {margin:0 var(--launch-inset) var(--launch-inset)}
 
 /* Move the actual layout landmarks together and crossfade the two lower panels. */
 @media(prefers-reduced-motion:no-preference) {
@@ -436,8 +479,8 @@ main:has(> #scanPage:not([hidden],.reportOnly)) {
   .movingOptions #launchTitle {view-transition-name:scan-title}
   .movingOptions .targetEntry {view-transition-name:scan-target}
   .movingOptions .scanOrb {view-transition-name:scan-run}
-  .movingOptions .launch summary {view-transition-name:scan-disclosure}
-  .movingOptions details[open] .options {view-transition-name:scan-settings}
+  .movingOptions #scanOptions > summary {view-transition-name:scan-disclosure}
+  .movingOptions #scanOptions[open] .options {view-transition-name:scan-settings}
   .movingOptions .referenceGrid {view-transition-name:scan-references}
   .movingOptions::view-transition {pointer-events:none}
   .movingOptions::view-transition-group(*) {
@@ -468,7 +511,7 @@ main:has(> #scanPage:not([hidden],.reportOnly)) {
 .running .launchHeader {align-self:start}
 .running .launchHeader h1 {margin-bottom:6px;font-size:clamp(28px,3.8vw,48px)}
 .running .scanStage {display:grid;place-items:center}
-.running .scanOrb {margin:18px 0;opacity:1}
+.running .scanOrb {margin:18px 0;opacity:1;font-size:15px;letter-spacing:.04em}
 .running .scanOrb::before {
   content:"";pointer-events:none;position:absolute;inset:-15px;border-radius:50%;
   border:1px solid var(--rule);box-shadow:0 0 0 7px var(--liquid-fill)

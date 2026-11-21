@@ -21,8 +21,12 @@ import (
 // Options controls how Nmap is run.
 type Options struct {
 	// Ports to scan, in Nmap syntax like "22,80,443" or "1-1000".
-	// Empty means Nmap's default top 1000 ports.
+	// Empty means Nmap's default top 1000 ports (unless TopPorts is set).
 	Ports string
+	// TopPorts scans the N most common ports (--top-ports N). Ignored when Ports is set.
+	TopPorts int
+	// LightVersion uses faster, lighter version detection (--version-light).
+	LightVersion bool
 	// SkipPing scans hosts even if they don't answer ping (Nmap's -Pn).
 	SkipPing bool
 }
@@ -37,8 +41,13 @@ func Args(targets []string, opt Options) []string {
 		"-T4",      // sensible speed for normal networks
 		"-oX", "-", // XML to stdout
 	}
+	if opt.LightVersion {
+		args = append(args, "--version-light")
+	}
 	if opt.Ports != "" {
 		args = append(args, "-p", opt.Ports)
+	} else if opt.TopPorts > 0 {
+		args = append(args, "--top-ports", strconv.Itoa(opt.TopPorts))
 	}
 	if opt.SkipPing {
 		args = append(args, "-Pn")

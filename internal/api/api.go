@@ -147,14 +147,14 @@ func (h *Handler) handleScan(w http.ResponseWriter, r *http.Request) {
 	if rep == nil && runErr != nil {
 		sendSSE(SSEMessage{
 			Type:    "error",
-			Message: fmt.Sprintf("Scan failed: %v", runErr),
+			Message: tools.FriendlyError(runErr),
 		})
 		return
 	}
 
 	errMsg := ""
 	if runErr != nil {
-		errMsg = runErr.Error()
+		errMsg = tools.FriendlyError(runErr)
 	}
 	if h.OnReport != nil {
 		h.OnReport(rep, errMsg)

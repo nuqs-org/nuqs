@@ -67,26 +67,83 @@
         </header>
         <form id="scanForm">
           <fieldset id="settings">
+            <div class="presetGallery" role="group" aria-label="Scan type">
+              <button type="button" class="presetCard" data-preset="quick" aria-pressed="false">
+                <span class="presetName">Quick scan</span>
+                <span class="presetDesc">Top 100 ports · fast service detection</span>
+              </button>
+              <button type="button" class="presetCard" data-preset="full" aria-pressed="true">
+                <span class="presetName">Full scan</span>
+                <span class="presetDesc">Top 1000 ports · all vulnerability checks</span>
+              </button>
+              <button type="button" class="presetCard" data-preset="custom" aria-pressed="false">
+                <span class="presetName">Custom</span>
+                <span class="presetDesc">Choose ports, discovery &amp; advanced limits</span>
+              </button>
+            </div>
             <div class="scanStage">
               <div class="targetEntry">
                 <label for="target">Target</label>
-                <div class="fieldLens"><input id="target" required placeholder="127.0.0.1" aria-describedby="scope"></div>
+                <div class="fieldLens"><input id="target" required placeholder="{{.SuggestedTarget}}" aria-describedby="scope"></div>
                 <small id="scope">{{.ScopeHint}}</small>
               </div>
               <button class="primary scanOrb" type="submit">RUN</button>
             </div>
-            <details>
+            <details id="scanOptions">
               <summary>Scan options</summary>
               <div class="options">
                 <div class="optionFields">
-                  <label>Ports<span class="fieldLens"><input id="ports" placeholder="Top 1000 ports"></span></label>
-                  <label>Check timeout<span class="fieldLens"><input id="timeout" value="30s" pattern=".*\S.*" title="Enter a positive duration such as 30s." required></span></label>
-                  <label>Concurrent checks<span class="fieldLens"><input id="workers" type="number" min="1" max="128" value="10" required></span></label>
+                  <label for="portPreset">Ports
+                    <span class="fieldLens">
+                      <select id="portPreset">
+                        <option value="top1000" selected>Top 1000 ports (default)</option>
+                        <option value="top100">Top 100 ports (fast)</option>
+                        <option value="web">Common web ports (80, 443, 8080, 8443)</option>
+                        <option value="all">All 65,535 ports (slow)</option>
+                        <option value="custom">Custom ports…</option>
+                      </select>
+                    </span>
+                  </label>
+                  <label id="customPortsWrap" for="ports" hidden>Custom ports
+                    <span class="fieldLens"><input id="ports" placeholder="22,80,443 or 1-1000"></span>
+                  </label>
                 </div>
                 <div class="optionFlags">
-                  <label class="option"><input type="checkbox" id="skipPing">Skip host discovery <code>-Pn</code></label>
-                  <label class="option"><input type="checkbox" id="force">Allow over 1024 addresses <code>--force</code></label>
+                  <label class="option">
+                    <input type="checkbox" id="skipPing">
+                    <span class="optionCopy">
+                      <strong>Scan hosts even if they don't answer ping (slower)</strong>
+                      <small>Finds hosts behind firewalls that block ping · <code>-Pn</code></small>
+                    </span>
+                  </label>
+                  <label class="option">
+                    <input type="checkbox" id="lightVersion">
+                    <span class="optionCopy">
+                      <strong>Fast service detection</strong>
+                      <small>Uses lighter version probes for quicker scans · <code>--version-light</code></small>
+                    </span>
+                  </label>
+                  <label class="option">
+                    <input type="checkbox" id="force">
+                    <span class="optionCopy">
+                      <strong>Allow large networks (more than 1,024 addresses)</strong>
+                      <small>Removes the default subnet size safeguard · <code>--force</code></small>
+                    </span>
+                  </label>
                 </div>
+                <details class="advancedOptions" id="advancedOptions">
+                  <summary>Advanced</summary>
+                  <div class="advancedFields">
+                    <label>Check timeout
+                      <span class="fieldLens"><input id="timeout" value="30s" pattern=".*\S.*" title="Enter a positive duration such as 30s." required></span>
+                      <small class="fieldHint">Maximum wait time for each vulnerability check.</small>
+                    </label>
+                    <label>Concurrent checks
+                      <span class="fieldLens"><input id="workers" type="number" min="1" max="128" value="10" required></span>
+                      <small class="fieldHint">How many checks run in parallel (1–128).</small>
+                    </label>
+                  </div>
+                </details>
               </div>
             </details>
           </fieldset>
@@ -100,6 +157,14 @@
         </div>
       </section>
     </div>
+
+    <section id="firstRun" class="firstRun" aria-labelledby="firstRunTitle"{{if .HasReport}} hidden{{end}}>
+      <div class="firstRunCopy">
+        <h2 id="firstRunTitle">Run your first scan</h2>
+        <p>Try scanning <code>{{.SuggestedTarget}}</code> to see open services, findings, and remediation steps right away.</p>
+      </div>
+      <button id="tryFirstScan" type="button" class="tryScanBtn" data-target="{{.SuggestedTarget}}">Try {{.SuggestedTarget}}</button>
+    </section>
 
     <section id="results" hidden tabindex="-1" data-has-server-report="{{.HasReport}}">
       <div class="heading">
@@ -116,9 +181,10 @@
           <h2>Scan profile</h2>
         </div>
         <dl>
+          <div><dt>Scan type</dt><dd id="profileScanType">Full scan</dd></div>
           <div><dt>Engine</dt><dd id="runner">{{.Status.Runner}}</dd></div>
           <div><dt>Port selection</dt><dd id="profilePorts">Top 1000</dd></div>
-          <div><dt>Host discovery</dt><dd id="discovery">Enabled</dd></div>
+          <div><dt>Host discovery</dt><dd id="discovery">Ping enabled</dd></div>
           <div><dt>Check timeout</dt><dd id="profileTimeout">30s</dd></div>
           <div><dt>Concurrency</dt><dd id="profileWorkers">10 workers</dd></div>
         </dl>
@@ -137,7 +203,14 @@
 
   <section id="reportEmpty" hidden>
     <div class="pageHead"><h1>Latest report</h1><p>Your most recent completed report on this device.</p></div>
-    <article><h2>No saved report</h2><p>Run a scan to see its findings, evidence, and check errors here.</p><button id="backScan" type="button">Go to scan console</button></article>
+    <article class="emptyCard">
+      <h2>Run your first scan</h2>
+      <p>No report saved yet. Try scanning <code>{{.SuggestedTarget}}</code> to see findings, evidence, and check errors here.</p>
+      <div class="emptyActions">
+        <button id="tryReportScan" type="button" class="tryScanBtn" data-target="{{.SuggestedTarget}}">Try {{.SuggestedTarget}}</button>
+        <button id="backScan" type="button">Go to scan console</button>
+      </div>
+    </article>
   </section>
 
   <section id="checksPage" hidden>

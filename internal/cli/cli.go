@@ -220,7 +220,7 @@ func (a *App) serve(ctx context.Context, args []string) int {
 	}
 	resolvedNmap, err := lookPath(bin)
 	if err != nil {
-		fmt.Fprintf(a.Stderr, "error: cannot find Nmap: %v\n", err)
+		fmt.Fprintf(a.Stderr, "error: Nmap isn't installed or wasn't found (%v). %s, or pass --nmap /path/to/nmap.\n", err, tools.NmapInstallHint())
 		return ExitError
 	}
 

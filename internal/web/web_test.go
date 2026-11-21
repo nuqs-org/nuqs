@@ -58,6 +58,15 @@ func TestIndexAndStaticAssets(t *testing.T) {
 			`hx-get="/partials/report"`,
 			"telnet-open",
 			"127.0.0.1:9002",
+			`data-preset="quick"`,
+			`data-preset="full"`,
+			`data-preset="custom"`,
+			`id="portPreset"`,
+			"Common web ports",
+			"Scan hosts even if they don't answer ping",
+			`id="advancedOptions"`,
+			"Run your first scan",
+			`data-target="127.0.0.1"`,
 		} {
 			if !strings.Contains(body, want) {
 				t.Errorf("index missing %q", want)
@@ -119,14 +128,26 @@ func TestChecksPartialsAndEmptyTemplates(t *testing.T) {
 		}
 	})
 
-	t.Run("displays custom allowed scope hint", func(t *testing.T) {
+	t.Run("displays custom allowed scope hint and suggested target", func(t *testing.T) {
 		h := newTestWeb(t, checks.All)
 		h.Service.AllowedScope = []netip.Prefix{netip.MustParsePrefix("192.168.56.0/24")}
 		r := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:9002/", nil)
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)
-		if !strings.Contains(w.Body.String(), "Allowed scope: 192.168.56.0/24.") {
+		body := w.Body.String()
+		if !strings.Contains(body, "Allowed scope: 192.168.56.0/24.") {
 			t.Fatalf("expected custom allowed scope hint in index")
+		}
+		if !strings.Contains(body, `data-target="192.168.56.0/24"`) {
+			t.Fatalf("expected suggested target from custom allowed scope")
+		}
+
+		// Single /32 host scope suggests the bare IP.
+		h.Service.AllowedScope = []netip.Prefix{netip.MustParsePrefix("10.0.0.5/32")}
+		w2 := httptest.NewRecorder()
+		h.ServeHTTP(w2, r)
+		if !strings.Contains(w2.Body.String(), `data-target="10.0.0.5"`) {
+			t.Fatalf("expected bare IP suggested target for /32 scope")
 		}
 	})
 }
@@ -204,7 +225,7 @@ func TestReportEscapingFilteringAndIncompleteStatus(t *testing.T) {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)
 		body := w.Body.String()
-		for _, want := range []string{"Scan incomplete in 1.50s", "1 host up · 2 open services", "1 high", "1 low", "Scan errors"} {
+		for _, want := range []string{"Scan incomplete in 1.5s", "1 host up · 2 open services", "1 high", "1 low", "Scan errors"} {
 			if !strings.Contains(body, want) {
 				t.Errorf("report missing %q", want)
 			}
@@ -230,6 +251,31 @@ func TestReportEscapingFilteringAndIncompleteStatus(t *testing.T) {
 		}
 		if !strings.Contains(findingsSection, "http-security-headers") || strings.Contains(findingsSection, "Unencrypted Telnet server") {
 			t.Fatalf("severity=low filter did not isolate low finding: %s", findingsSection)
+		}
+	})
+
+	t.Run("shows concise Finished status for clean fast scan", func(t *testing.T) {
+		cleanRep := &engine.Report{
+			Targets:  []string{"127.0.0.1"},
+			Started:  started,
+			Finished: started.Add(200 * time.Millisecond),
+		}
+		h.SetReport(cleanRep, "")
+		r := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:9002/partials/report?fresh=1", nil)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		body := w.Body.String()
+		if !strings.Contains(body, "Finished in 0.2s") || !strings.Contains(body, "statusPill done") {
+			t.Fatalf("expected clean finished status, got: %s", body)
+		}
+		if !strings.Contains(body, "Scan hosts even if they don&#39;t answer ping") {
+			t.Fatalf("expected plain-English ping hint when zero hosts up, got: %s", body)
+		}
+		if got := formatDuration(0.04); got != "0.04s" {
+			t.Fatalf("formatDuration(0.04) = %q, want 0.04s", got)
+		}
+		if got := formatDuration(-1); got != "0.0s" {
+			t.Fatalf("formatDuration(-1) = %q, want 0.0s", got)
 		}
 	})
 }

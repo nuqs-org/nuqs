@@ -5,6 +5,9 @@ package tools
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
+	"os/exec"
 	"slices"
 	"strings"
 	"testing"
@@ -135,6 +138,8 @@ func TestValidateScan(t *testing.T) {
 		"ports bad range":   {Target: "127.0.0.1", Ports: "100-50"},
 		"ports out of max":  {Target: "127.0.0.1", Ports: "70000"},
 		"ports empty entry": {Target: "127.0.0.1", Ports: "80,,443"},
+		"negative top ports": {Target: "127.0.0.1", TopPorts: -5},
+		"huge top ports":     {Target: "127.0.0.1", TopPorts: 70000},
 	}
 	for name, req := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -144,6 +149,72 @@ func TestValidateScan(t *testing.T) {
 				t.Fatalf("expected ValidationError, got %T: %v", err, err)
 			}
 		})
+	}
+
+	t.Run("accepts quick scan top_ports and light_version", func(t *testing.T) {
+		scan, err := svc.ValidateScan(ScanRequest{
+			Target:       "127.0.0.1",
+			TopPorts:     100,
+			LightVersion: true,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if scan.TopPorts != 100 || !scan.LightVersion || scan.Ports != "" {
+			t.Fatalf("unexpected scan: %+v", scan)
+		}
+
+		// Explicit ports clears top_ports so Nmap never receives both.
+		scan2, err := svc.ValidateScan(ScanRequest{
+			Target:   "127.0.0.1",
+			Ports:    "80,443",
+			TopPorts: 100,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if scan2.Ports != "80,443" || scan2.TopPorts != 0 {
+			t.Fatalf("explicit ports should clear TopPorts: %+v", scan2)
+		}
+	})
+}
+
+func TestFriendlyErrorAndInstallHint(t *testing.T) {
+	if !strings.Contains(nmapInstallHintFor("darwin"), "brew install nmap") {
+		t.Fatalf("darwin hint = %q", nmapInstallHintFor("darwin"))
+	}
+	if !strings.Contains(nmapInstallHintFor("windows"), "winget install Insecure.Nmap") {
+		t.Fatalf("windows hint = %q", nmapInstallHintFor("windows"))
+	}
+	if !strings.Contains(nmapInstallHintFor("linux"), "apt install nmap") {
+		t.Fatalf("linux hint = %q", nmapInstallHintFor("linux"))
+	}
+	if NmapInstallHint() == "" {
+		t.Fatal("NmapInstallHint should not be empty")
+	}
+
+	cases := []struct {
+		err  error
+		want string
+	}{
+		{nil, ""},
+		{&ValidationError{Message: "bad input"}, "bad input"},
+		{context.Canceled, "Scan stopped before finishing."},
+		{context.DeadlineExceeded, "Scan timed out before finishing."},
+		{fmt.Errorf("discovery failed: %w", exec.ErrNotFound), "Nmap isn't installed"},
+		{os.ErrNotExist, "Nmap isn't installed"},
+		{os.ErrPermission, "Permission denied while running Nmap"},
+		{errors.New("nmap failed: Failed to resolve given hostname/IP"), "Couldn't resolve that target hostname"},
+		{errors.New("discovery failed: reading nmap XML: EOF"), "Nmap stopped unexpectedly"},
+		{errors.New("discovery failed: something custom"), "something custom"},
+	}
+	for _, tc := range cases {
+		got := FriendlyError(tc.err)
+		if tc.want == "" && got != "" {
+			t.Errorf("FriendlyError(%v) = %q, want empty", tc.err, got)
+		} else if tc.want != "" && !strings.Contains(got, tc.want) {
+			t.Errorf("FriendlyError(%v) = %q, want substring %q", tc.err, got, tc.want)
+		}
 	}
 }
 

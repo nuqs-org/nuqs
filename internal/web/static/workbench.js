@@ -6,11 +6,25 @@ const levels = ["critical", "high", "medium", "low", "info"];
 const reportKey = "nuqs:last-report:v1";
 let current = null;
 let hasServerReport = byId("results")?.dataset.hasServerReport === "true";
+let reportContentCleared = false;
 let controller = null;
 let started = 0;
 let phase = "";
 let total = 0;
 let completed = 0;
+let activePreset = "full";
+const presetNames = {quick: "Quick scan", full: "Full scan", custom: "Custom"};
+const portPresetLabels = {
+  top1000: "Top 1000",
+  top100: "Top 100",
+  web: "Web (80,443,8080,8443)",
+  all: "All (1-65535)"
+};
+
+function formatDuration(seconds) {
+  const safe = Math.max(0, Number.isFinite(seconds) ? seconds : 0);
+  return safe > 0 && safe < 0.1 ? safe.toFixed(2) + "s" : safe.toFixed(1) + "s";
+}
 
 function node(tag, text, className) {
   const el = document.createElement(tag);
@@ -105,6 +119,11 @@ function hasAnyReport() {
   return hasServerReport || Boolean(current);
 }
 
+function updateEmptyState() {
+  const firstRun = byId("firstRun");
+  if (firstRun) firstRun.hidden = hasAnyReport();
+}
+
 function navigate(page, fresh = false) {
   if (narrowWindow.matches) setCompact(true);
   const reportOnly = page === "report";
@@ -121,7 +140,16 @@ function navigate(page, fresh = false) {
     } else button.removeAttribute("aria-current");
   }
   if (reportOnly && hasReport) {
-    if (!fresh && !hasServerReport && current) renderLocalReport(current, true);
+    if (reportContentCleared) {
+      reportContentCleared = false;
+      if (hasServerReport && window.htmx) {
+        window.htmx.ajax("GET", "/partials/report", {target: "#reportContent", swap: "innerHTML"});
+      } else if (current) {
+        renderLocalReport(current, true);
+      }
+    } else if (!fresh && !hasServerReport && current) {
+      renderLocalReport(current, true);
+    }
     byId("reportHeading").focus({preventScroll: true});
   } else if (reportOnly) {
     const heading = byId("reportEmpty").querySelector("h1");
@@ -129,6 +157,7 @@ function navigate(page, fresh = false) {
     heading.focus({preventScroll: true});
   }
   byId("results").hidden = !reportOnly || !hasReport;
+  updateEmptyState();
   window.scrollTo(0, 0);
 }
 byId("scanTab").onclick = byId("backScan").onclick = () => navigate("scan");
@@ -137,6 +166,19 @@ byId("checksTab").onclick = byId("openLibrary").onclick = () => {
   if (window.htmx) window.htmx.trigger(byId("checkSearch"), "search");
 };
 byId("reportTab").onclick = () => navigate("report");
+
+function trySuggestedScan(button) {
+  if (controller) return;
+  const suggested = button.dataset.target || "127.0.0.1";
+  navigate("scan");
+  byId("target").value = suggested;
+  updateProfile();
+  byId("scanForm").requestSubmit();
+}
+for (const id of ["tryFirstScan", "tryReportScan"]) {
+  const btn = byId(id);
+  if (btn) btn.onclick = () => trySuggestedScan(btn);
+}
 
 async function engineStatus() {
   try {
@@ -160,14 +202,56 @@ async function engineStatus() {
 }
 engineStatus();
 
+const presetButtons = Array.from(document.querySelectorAll(".presetCard"));
+
+function setActivePreset(preset) {
+  activePreset = preset;
+  for (const button of presetButtons) {
+    button.setAttribute("aria-pressed", String(button.dataset.preset === preset));
+  }
+}
+
+function toggleCustomPorts() {
+  const isCustom = byId("portPreset").value === "custom";
+  byId("customPortsWrap").hidden = !isCustom;
+  byId("ports").required = isCustom;
+}
+
+function syncPresetFromForm() {
+  const portPreset = byId("portPreset").value;
+  const light = byId("lightVersion").checked;
+  const defaults = !byId("skipPing").checked && !byId("force").checked &&
+    byId("timeout").value.trim() === "30s" && byId("workers").valueAsNumber === 10;
+  if (defaults && portPreset === "top100" && light) setActivePreset("quick");
+  else if (defaults && portPreset === "top1000" && !light) setActivePreset("full");
+  else setActivePreset("custom");
+}
+
 function updateProfile() {
-  byId("profilePorts").textContent = byId("ports").value.trim() || "Top 1000";
-  byId("discovery").textContent = byId("skipPing").checked ? "Skipped" : "Enabled";
+  toggleCustomPorts();
+  const portPreset = byId("portPreset").value;
+  const portText = portPreset === "custom" ? (byId("ports").value.trim() || "Custom") : (portPresetLabels[portPreset] || "Top 1000");
+  byId("profileScanType").textContent = presetNames[activePreset] || "Full scan";
+  byId("profilePorts").textContent = portText;
+  byId("discovery").textContent = byId("skipPing").checked ? "Scan all (no ping)" : "Ping enabled";
   byId("profileTimeout").textContent = byId("timeout").value || "—";
   byId("profileWorkers").textContent = (byId("workers").value || "—") + " workers";
 }
-byId("scanForm").addEventListener("input", updateProfile);
-byId("scanForm").addEventListener("change", updateProfile);
+
+byId("portPreset").addEventListener("change", () => {
+  toggleCustomPorts();
+  syncPresetFromForm();
+  updateProfile();
+  if (byId("portPreset").value === "custom") byId("ports").focus();
+});
+byId("scanForm").addEventListener("input", event => {
+  if (event.target && event.target.id !== "target") syncPresetFromForm();
+  updateProfile();
+});
+byId("scanForm").addEventListener("change", event => {
+  if (event.target && event.target.id !== "target") syncPresetFromForm();
+  updateProfile();
+});
 updateProfile();
 
 function badge(level) {
@@ -205,7 +289,7 @@ function renderLocalFindings() {
   if (!findings.length) {
     const hostsUp = (current.report.hosts || []).length;
     byId("findings").textContent = selected ? "No findings at this severity." :
-      hostsUp === 0 ? "No live hosts responded (try Skip host discovery if ping is blocked)." : "No findings reported.";
+      hostsUp === 0 ? 'No live hosts responded. Try enabling "Scan hosts even if they don\'t answer ping" in Scan options.' : "No findings reported.";
   }
 }
 
@@ -218,6 +302,21 @@ function setRawVisible(show) {
   toggleEl.textContent = show ? "Hide raw JSON" : "Show raw JSON";
 }
 
+function clearReportView() {
+  byId("results").hidden = true;
+  if (byId("status")) {
+    byId("status").className = "statusPill";
+    byId("status").textContent = "";
+  }
+  if (byId("metadata")) byId("metadata").textContent = "";
+  if (byId("counts")) byId("counts").replaceChildren();
+  if (byId("raw")) byId("raw").textContent = "";
+  setRawVisible(false);
+  if (byId("findings")) byId("findings").replaceChildren();
+  if (byId("errors")) byId("errors").replaceChildren();
+  reportContentCleared = true;
+}
+
 function renderLocalReport(saved, restored) {
   const {report, message} = saved;
   current = saved;
@@ -228,8 +327,12 @@ function renderLocalReport(saved, restored) {
   const openServices = hosts.reduce((sum, h) => sum + (h.services ? h.services.length : 0), 0);
   const duration = Math.max(0, (Date.parse(report.finished) - Date.parse(report.started)) / 1000);
   const incomplete = message || reportErrors.length;
-  const outcome = incomplete ? "Scan incomplete" : "Scan finished";
-  byId("status").textContent = (restored ? "Last report · " : "") + outcome + " in " + duration.toFixed(2) + "s";
+  const outcome = incomplete ? "Scan incomplete" : "Finished";
+  const statusEl = byId("status");
+  if (statusEl) {
+    statusEl.className = "statusPill " + (incomplete ? "incomplete" : "done");
+    statusEl.textContent = (restored ? "Last report · " : "") + outcome + " in " + formatDuration(duration);
+  }
   const hostSummary = hosts.length + (hosts.length === 1 ? " host up" : " hosts up") + " · " +
     openServices + (openServices === 1 ? " open service" : " open services");
   byId("metadata").textContent = targets.join(", ") + " · " + hostSummary + " · " + new Date(report.finished).toLocaleString();
@@ -323,15 +426,22 @@ function markStage(index) {
 function handleEvent(event) {
   if (event.type === "error") throw new Error(event.message || "Scan failed.");
   if (event.type === "report" && event.report) return {report: event.report, message: event.message || ""};
-  if (event.kind === "discovery_started") { markStage(0); phase = "Discovering services"; }
-  if (event.kind === "discovery_done") phase = "Discovered " + (event.count || 0) + " hosts";
-  if (event.kind === "checks_started") { markStage(1); total = event.count || 0; phase = "Running " + total + " checks"; }
+  if (event.kind === "discovery_started") { markStage(0); phase = "Scanning — finding open ports and services…"; }
+  if (event.kind === "discovery_done") {
+    const count = event.count || 0;
+    phase = "Found " + count + (count === 1 ? " live host" : " live hosts");
+  }
+  if (event.kind === "checks_started") {
+    markStage(1);
+    total = event.count || 0;
+    phase = "Running " + total + (total === 1 ? " check…" : " checks…");
+  }
   if (event.kind === "checks_started" || event.kind === "check_done") {
     if (event.kind === "check_done") completed++;
     byId("checkCount").hidden = false;
     byId("checkCount").textContent = completed + " of " + total + " checks completed";
   }
-  if (event.kind === "scan_done") { markStage(2); phase = "Preparing report"; }
+  if (event.kind === "scan_done") { markStage(2); phase = "Preparing report…"; }
   announcePhase();
 }
 
@@ -385,13 +495,16 @@ document.body.addEventListener("htmx:afterSwap", event => bindReflections(event.
 
 byId("stop").onclick = () => controller?.abort();
 // Keep the native disclosure and keyboard behavior when layout animation is unavailable.
-const scanOptions = document.querySelector(".launch details");
+const scanOptions = byId("scanOptions");
 let optionsTransition;
 let requestedOpen;
-scanOptions.querySelector("summary").addEventListener("click", event => {
-  if (!document.startViewTransition || reduceEffects.matches) return;
-  event.preventDefault();
-  requestedOpen = !(optionsTransition ? requestedOpen : scanOptions.open);
+function setOptionsOpen(open) {
+  if (scanOptions.open === open && !optionsTransition) return;
+  if (!document.startViewTransition || reduceEffects.matches) {
+    scanOptions.open = open;
+    return;
+  }
+  requestedOpen = open;
   optionsTransition?.skipTransition();
   document.documentElement.classList.add("movingOptions");
   const transition = document.startViewTransition(() => {
@@ -403,17 +516,66 @@ scanOptions.querySelector("summary").addEventListener("click", event => {
     optionsTransition = null;
     document.documentElement.classList.remove("movingOptions");
   });
+}
+scanOptions.querySelector(":scope > summary").addEventListener("click", event => {
+  if (!document.startViewTransition || reduceEffects.matches) return;
+  event.preventDefault();
+  setOptionsOpen(!(optionsTransition ? requestedOpen : scanOptions.open));
 });
 
+function applyPreset(preset) {
+  setActivePreset(preset);
+  if (preset === "quick") {
+    byId("portPreset").value = "top100";
+    byId("lightVersion").checked = true;
+    byId("skipPing").checked = false;
+    byId("force").checked = false;
+    byId("timeout").value = "30s";
+    byId("workers").value = "10";
+    setOptionsOpen(false);
+  } else if (preset === "full") {
+    byId("portPreset").value = "top1000";
+    byId("lightVersion").checked = false;
+    byId("skipPing").checked = false;
+    byId("force").checked = false;
+    byId("timeout").value = "30s";
+    byId("workers").value = "10";
+    setOptionsOpen(false);
+  } else {
+    setOptionsOpen(true);
+  }
+  updateProfile();
+  if (preset === "custom") byId("portPreset").focus();
+}
+for (const button of presetButtons) {
+  button.addEventListener("click", () => applyPreset(button.dataset.preset));
+}
+
+function buildPortSettings() {
+  const preset = byId("portPreset").value;
+  if (preset === "top100") return {ports: "", top_ports: 100};
+  if (preset === "web") return {ports: "80,443,8080,8443", top_ports: 0};
+  if (preset === "all") return {ports: "1-65535", top_ports: 0};
+  if (preset === "custom") return {ports: byId("ports").value.trim(), top_ports: 0};
+  return {ports: "", top_ports: 0};
+}
+
 byId("scanForm").addEventListener("invalid", event => {
-  if (event.target.closest("details")) event.target.closest("details").open = true;
+  let details = event.target.closest("details");
+  while (details) {
+    details.open = true;
+    details = details.parentElement ? details.parentElement.closest("details") : null;
+  }
 }, true);
 byId("scanForm").onsubmit = async event => {
   event.preventDefault();
   if (controller) return;
+  const portSettings = buildPortSettings();
   const request = {
     target: byId("target").value.trim(),
-    ports: byId("ports").value.trim(),
+    ports: portSettings.ports,
+    top_ports: portSettings.top_ports,
+    light_version: byId("lightVersion").checked,
     timeout: byId("timeout").value.trim(),
     workers: byId("workers").valueAsNumber,
     skip_ping: byId("skipPing").checked,
@@ -422,18 +584,22 @@ byId("scanForm").onsubmit = async event => {
   controller = new AbortController();
   byId("reportTab").disabled = true;
   started = performance.now();
-  phase = "Starting";
+  phase = "Scanning " + request.target + "…";
   completed = 0;
   total = 0;
   const before = scanButton.getBoundingClientRect();
   byId("settings").disabled = true;
   byId("checkCount").hidden = true;
   byId("stop").hidden = false;
-  byId("results").hidden = true;
+  // Clear old report output immediately so it is obvious a fresh scan started.
+  clearReportView();
+  byId("scanPhase").classList.remove("isError");
   announcePhase();
-  byId("launchTitle").textContent = "Scan in progress";
-  byId("activeTarget").textContent = request.target;
+  byId("launchTitle").textContent = "Scanning…";
+  byId("activeTarget").textContent = request.target + " · " + (presetNames[activePreset] || "Full scan");
   byId("activeTarget").hidden = false;
+  scanButton.textContent = "SCANNING";
+  byId("scanPage").setAttribute("aria-busy", "true");
   byId("scanPage").classList.add("running");
   markStage(-1);
   byId("scanSteps").hidden = false;
@@ -447,7 +613,8 @@ byId("scanForm").onsubmit = async event => {
   byId("elapsed").hidden = false;
   updateClock();
   byId("stop").focus({preventScroll: true});
-  const timer = setInterval(updateClock, 250);
+  const timer = setInterval(updateClock, 100);
+  let finishedNotice = "";
   try {
     const response = await fetch("/api/scan", {
       method: "POST",
@@ -457,23 +624,35 @@ byId("scanForm").onsubmit = async event => {
     });
     if (!response.ok) throw new Error((await response.text()).trim() || "Scan request failed.");
     const saved = await receive(response);
+    reportContentCleared = false;
     await refreshServerReport(saved);
+    updateEmptyState();
+    const duration = saved.report ? Math.max(0, (Date.parse(saved.report.finished) - Date.parse(saved.report.started)) / 1000) : (performance.now() - started) / 1000;
+    const incomplete = Boolean(saved.message || (saved.report && saved.report.errors && saved.report.errors.length));
+    finishedNotice = (incomplete ? "Scan incomplete in " : "Finished in ") + formatDuration(duration);
     if (!byId("scanPage").hidden) navigate("report", true);
     if (!save(reportKey, saved) && byId("status")) {
       byId("status").textContent += " · Report could not be saved on this device.";
     }
   } catch (err) {
-    byId("scanPhase").textContent = controller.signal.aborted ? "Scan stopped." :
-      err instanceof TypeError ? "Can't reach the scan server." : err.message;
+    const aborted = controller.signal.aborted;
+    byId("scanPhase").classList.toggle("isError", !aborted);
+    byId("scanPhase").textContent = aborted ? "Scan stopped." :
+      err instanceof TypeError ? 'Can\'t reach the Nuqs server. Make sure "nuqs serve" is still running in your terminal.' : err.message;
   } finally {
     if (!controller.signal.aborted) void engineStatus();
     clearInterval(timer);
     byId("scanSteps").hidden = true;
     byId("scanPage").classList.remove("running");
+    byId("scanPage").removeAttribute("aria-busy");
+    scanButton.textContent = "RUN";
     byId("launchTitle").textContent = "New scan";
     byId("activeTarget").hidden = true;
     byId("elapsed").hidden = true;
-    if (!byId("results").hidden) byId("scanPhase").textContent = "";
+    if (finishedNotice) {
+      byId("scanPhase").classList.remove("isError");
+      byId("scanPhase").textContent = finishedNotice;
+    }
     const returnFocus = document.activeElement === byId("stop");
     controller = null;
     byId("reportTab").disabled = false;
@@ -490,4 +669,6 @@ if (hasServerReport) {
 } else if (previous) {
   try { current = previous; navigate("report"); }
   catch { current = null; navigate("scan"); if (byId("status")) byId("status").textContent = ""; }
+} else {
+  updateEmptyState();
 }
