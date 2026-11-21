@@ -1,20 +1,14 @@
-# Nuqs UI/UX Workbench & Live Web Interface
+# Nuqs local UI prototype
 
-This directory holds the interface designs, visual specifications, and the live Go web server for **Nuqs Web**.
+Run `go run ./designs/server.go` from the repository root and open
+`http://127.0.0.1:9002`. Install Nmap first. The server resolves Nmap at startup
+from PATH or from `NUQS_NMAP_PATH`. Set `PORT` to choose another loopback port.
 
-## Structure
-- `index.html`: **The Primary Interactive Workbench**. A high-legibility, HCI-compliant security audit interface featuring both **Inky Dark** (`#060709`) and **Slate Light** (`#f6f8fb`) themes. It connects directly to the live Go engine over Server-Sent Events (SSE) or runs standalone in offline mode.
-- `server.go`: **Lightweight, Zero-Dependency Go Web Server**. Serves the interface on port `9002` and connects browser actions directly to the real Go `engine.Engine` and Nmap runner.
-- `../DESIGN.md`: The complete HCI design system specification, WCAG 2.1 AAA contrast metrics, and typography rationale.
+The prototype uses the existing Go scanner and a same-origin JSON POST with a
+streamed report. Allowed targets are localhost and IPv4 loopback addresses or
+ranges. The address limit applies unless explicitly overridden within that scope.
+The default scan uses host discovery and the top 1000 ports.
 
-## Quick Start (Run Live UI)
-
-```powershell
-go run .\designs\server.go
-```
-Visit **`http://127.0.0.1:9002`** in your browser.
-
-## Built-in API Endpoints
-- `POST /api/scan`: Runs real-time vulnerability scans against targets with Nmap discovery, streaming the 4 discrete engine events over SSE and returning the final `engine.Report` JSON.
-- `GET /api/checks`: Returns the catalog of registered security checks currently registered in `package checks`.
-- `GET /api/status`: Returns engine status, uptime, runner details, and loaded check IDs.
+The browser stores the last report, including evidence, in local storage on this
+origin. Clearing site data removes it. The page uses local assets and system fonts.
+The production UI architecture is described in [the web UI plan](../docs/ui/building.md).
