@@ -15,7 +15,7 @@ library and latest report. The scan profile reflects current form values and the
 registered-check inventory comes from the engine. On narrow screens navigation starts as an icon rail and the profile sits below scan configuration.
 
 A plain canvas supports glass panels with a lightly tinted rim. The full-height
-monochrome navigation rail holds an editable local profile at its foot and collapses to icons. Appearance follows the system setting until the user selects light or dark mode in the sidebar. Display headings use Avenir Next with sans-serif fallbacks. Body text uses the system sans serif. Increased contrast and reduced transparency use solid panels.
+monochrome navigation rail holds an editable local profile at its foot and collapses to icons. Appearance follows the system setting until the user selects light or dark mode in the workspace header. Display headings use Avenir Next with sans-serif fallbacks. Body text uses the system sans serif. Increased contrast and reduced transparency use solid panels.
 
 New scan anchors the console. Align the target field, circular submit control
 and options disclosure on a shared centerline. Show the busy label and ring
