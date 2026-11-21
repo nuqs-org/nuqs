@@ -28,3 +28,72 @@ main {max-width:1460px;margin:0 0 0 var(--rail);padding:clamp(24px,3vw,46px) cla
 @media(max-width:800px){.workgrid{grid-template-columns:1fr}.profile dl{grid-template-columns:1fr 1fr}}
 @media(max-width:650px){.rail{position:static;width:auto;padding:10px 14px;display:grid;grid-template-columns:1fr auto;gap:10px;border-right:0;border-bottom:1px solid var(--line)}.brand{font-size:24px;padding:0}.brand i{width:16px;height:20px}.railLabel,.railFoot span{display:none}.railFoot{grid-column:2;grid-row:1;padding:0;border:0;margin:0}.railFoot button{font-size:12px}.rail nav{grid-column:1/-1;grid-row:2;display:flex;flex-wrap:wrap}.rail nav button{font-size:13px;padding:5px 8px;gap:5px}.rail nav svg{width:14px}.top,main{margin-left:0}.top{min-height:40px}.checkRow{grid-template-columns:minmax(0,1fr) 65px;padding:10px 14px}.checkRow>:nth-child(2){display:none}.connection{font-size:11px}}
 .reportOnly > :is(.pageHead,.workgrid,#inventory,#stop) {display:none}
+
+/* Floating glass controls above a stationary, locally drawn wallpaper. */
+:root {
+  --bg:#101722; --panel:#18212d; --line:#37404e; --text:#f6f8ff; --muted:#c0cbd9;
+  --accent:#b5d7ff; --action:#c6ddff; --ink:#10223b;
+  --glass:rgba(32,45,65,.66); --glass-base:#2a394c;
+  --rim:rgba(228,240,255,.30); --shine:rgba(255,255,255,.19);
+  --selection:rgba(207,228,255,.16); --paper:#111826;
+  --ribbon:#436baa; --ribbon-mid:#283e76; --ribbon-edge:#92cce0;
+  --shadow:0 12px 38px -16px rgba(0,0,0,.55);
+}
+:root.light {
+  --bg:#e5ebf2; --panel:#f9fbfe; --line:#ced6df; --text:#151e30; --muted:#445366;
+  --accent:#1c508a; --action:#215fa9; --ink:white;
+  --glass:rgba(242,248,255,.65); --glass-base:#e8eff6;
+  --rim:rgba(255,255,255,.84); --shine:rgba(255,255,255,.95);
+  --selection:rgba(255,255,255,.52); --paper:#e2eaf4;
+  --ribbon:#a2bcdc; --ribbon-mid:#bcc8e1; --ribbon-edge:#ecfbff;
+  --shadow:0 10px 38px -20px rgba(42,59,87,.36);
+}
+body {isolation:isolate;min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif}
+.wallpaper {position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:-1;background:var(--paper)}
+.wallpaper i {position:absolute;display:block;width:145vw;height:68vh;top:-47vh;left:-24vw;transform:rotate(-22deg);border-radius:50%;
+  background:linear-gradient(172deg,transparent 42%,var(--ribbon-mid) 69%,var(--ribbon) 90%,var(--ribbon-edge) 99.6%);
+  box-shadow:0 2px 3px var(--shine),0 20px 65px rgba(5,14,34,.23)}
+.wallpaper i:nth-child(2) {top:-40vh;left:2vw;transform:rotate(-27deg);opacity:.76}
+.wallpaper i:nth-child(3) {top:-38vh;left:28vw;transform:rotate(-34deg);opacity:.72}
+.rail,.top,.primary,.rail nav [aria-current],#theme {
+  border:1px solid var(--rim);box-shadow:inset 0 1px 1px var(--shine),var(--shadow)
+}
+.rail,.top {background:var(--glass-base)}
+@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
+  .rail,.top {background:var(--glass);-webkit-backdrop-filter:blur(24px) saturate(1.35);backdrop-filter:blur(24px) saturate(1.35)}
+}
+.rail {inset:22px auto auto 18px;width:calc(var(--rail) - 18px);border-radius:28px;padding:19px 10px 10px}
+.brand {padding:0 12px 22px;font-size:32px;font-weight:700;letter-spacing:-2px}.brand i {background:var(--text)}
+.rail nav {gap:5px}.rail nav button {min-height:42px;border-radius:24px;color:var(--text)}
+.rail nav [aria-current] {background:var(--selection);color:var(--text);box-shadow:inset 0 1px 1px var(--shine),0 2px 5px #101c3214}
+.railFoot {margin:18px 6px 0;padding:11px 0 0;border-color:var(--rim)}
+#theme {justify-self:start;border-radius:20px;background:var(--selection);font-size:13px;padding:6px 12px;box-shadow:inset 0 1px 1px var(--shine)}
+.top {top:16px;margin:20px clamp(20px,4vw,64px) 0 calc(var(--rail) + clamp(18px,4vw,56px));min-height:44px;padding:8px 18px;border-radius:24px;color:var(--text)}
+.top b {color:var(--muted)}.connection {font:500 12px -apple-system,BlinkMacSystemFont,sans-serif}
+.connection.ready::before {background:#57ac86}
+main {padding-top:clamp(30px,4.6vw,70px)}
+.pageHead {margin-bottom:26px}.pageHead h1 {font-weight:650;font-size:clamp(40px,4.4vw,68px);letter-spacing:-.065em}.pageHead p {color:var(--text)}
+.workgrid {gap:0;background:var(--panel);border:1px solid var(--rim);border-radius:24px;box-shadow:var(--shadow);overflow:hidden}
+.launch,.profile {border:0;border-radius:0;background:none}.profile {border-left:1px solid var(--line);margin:18px 0}
+.panelTitle {border:0;padding:22px 24px 0}.profile .panelTitle {padding-top:4px}.launch form {padding:18px 24px 22px}
+.profile dl {margin:14px 24px 0}.panelTitle h2,#inventory h2 {font-size:19px}.launch details {margin-top:16px}
+.controls {margin:8px 0}.controls input {border-radius:14px;min-height:44px;padding-inline:14px}
+.primary {border-radius:24px;padding:10px 19px;background:var(--action);box-shadow:inset 0 1px 2px var(--shine),0 3px 9px #08142322}
+button:not(:disabled):active {transform:scale(.98)}
+#inventory,article,pre {border-radius:20px;background:var(--panel)}#inventory>.heading {padding:17px 22px}
+.badge {border-radius:20px;padding:2px 9px}.checkRow.head {background:var(--panel)}
+.toolbar, #results>.heading {border-radius:18px;background:var(--panel);padding:10px 14px}
+button,select {border-radius:18px}
+@media(max-width:800px){.profile{margin:0 24px 18px;border:0;border-top:1px solid var(--line)}.profile .panelTitle{padding:14px 0 0}.profile dl{margin:10px 0 0}}
+@media(max-width:650px){
+  .rail {width:auto;margin:10px;border-radius:24px;padding:10px 12px;gap:6px}
+  .brand {font-size:26px;padding:0 4px}.railFoot {margin:0;padding:0;border:0}.rail nav button {min-height:36px}
+  .top {position:static;margin:8px 12px 0;padding:6px 12px;min-height:34px}
+  main {padding-top:22px}.launch form {padding:14px 16px}.panelTitle {padding:16px 16px 0}
+  .profile {margin:0 16px 16px}
+}
+@media(prefers-reduced-transparency:reduce),(prefers-contrast:more){
+  .wallpaper i {display:none}.rail,.top {background:var(--glass-base);backdrop-filter:none;-webkit-backdrop-filter:none}
+  .rail nav [aria-current] {background:var(--panel);border-color:var(--accent)}
+}
+@media(prefers-reduced-motion:reduce){button:not(:disabled):active {transform:none}}

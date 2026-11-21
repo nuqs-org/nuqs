@@ -14,3 +14,8 @@ The persistent workspace navigation connects the scan console, searchable check
 library and latest report. The scan profile reflects current form values and the
 registered-check inventory comes from the engine. On narrow screens navigation
 moves above the workspace and the profile sits below scan configuration.
+
+The web treatment of Liquid Glass uses floating navigation, translucent surfaces
+and a local CSS wallpaper. Text-heavy report surfaces remain opaque. Browsers
+without backdrop filtering receive a solid navigation surface. Increased contrast
+and reduced transparency preferences also remove the wallpaper ribbons and blur.
