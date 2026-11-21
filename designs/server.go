@@ -2,18 +2,23 @@
 // for the Nuqs Network Vulnerability Audit Workbench.
 //
 // Usage:
-//   go run ./designs/server.go
+//
+//	go run ./designs/server.go
 //
 // Then open http://127.0.0.1:9002 in your browser.
 package main
 
 import (
-	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log"
+	"mime"
 	"net/http"
+	"net/netip"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -25,14 +30,14 @@ import (
 )
 
 type StatusResponse struct {
-	Engine   string   `json:"engine"`
-	Version  string   `json:"version"`
-	Runner   string   `json:"runner"`
-	Uptime   string   `json:"uptime"`
-	Modules  int      `json:"modules"`
-	Loaded   []string `json:"loaded"`
-	Addr     string   `json:"addr"`
-	Status   string   `json:"status"`
+	Engine  string   `json:"engine"`
+	Version string   `json:"version"`
+	Runner  string   `json:"runner"`
+	Uptime  string   `json:"uptime"`
+	Modules int      `json:"modules"`
+	Loaded  []string `json:"loaded"`
+	Addr    string   `json:"addr"`
+	Status  string   `json:"status"`
 }
 
 type CheckItem struct {
@@ -51,18 +56,17 @@ type ScanRequest struct {
 	Force    bool   `json:"force"`
 	Workers  int    `json:"workers"`
 	Timeout  string `json:"timeout"`
-	NmapPath string `json:"nmap_path"`
 }
 
 type SSEMessage struct {
-	Type     string         `json:"type"`                // "progress", "report", "error"
-	Kind     string         `json:"kind,omitempty"`      // DiscoveryStarted, DiscoveryDone, etc.
-	Count    int            `json:"count,omitempty"`
-	CheckID  string         `json:"check_id,omitempty"`
-	Host     string         `json:"host,omitempty"`
-	Port     int            `json:"port,omitempty"`
-	Report   *engine.Report `json:"report,omitempty"`
-	Message  string         `json:"message,omitempty"`
+	Type    string         `json:"type"`           // "progress", "report", "error"
+	Kind    string         `json:"kind,omitempty"` // DiscoveryStarted, DiscoveryDone, etc.
+	Count   int            `json:"count,omitempty"`
+	CheckID string         `json:"check_id,omitempty"`
+	Host    string         `json:"host,omitempty"`
+	Port    int            `json:"port,omitempty"`
+	Report  *engine.Report `json:"report,omitempty"`
+	Message string         `json:"message,omitempty"`
 }
 
 var startTime = time.Now()
@@ -73,6 +77,15 @@ func main() {
 		port = envPort
 	}
 
+	addr := "127.0.0.1:" + port
+	path := os.Getenv("NUQS_NMAP_PATH")
+	if path == "" {
+		path = "nmap"
+	}
+	path, err := exec.LookPath(path)
+	if err != nil {
+		log.Fatalf("cannot find Nmap: %v", err)
+	}
 	mux := http.NewServeMux()
 
 	// 1. Static file serving (delivers index.html and design assets)
@@ -126,40 +139,37 @@ func main() {
 	})
 
 	// 4. LIVE SCAN API: POST /api/scan (Streams events via SSE directly from engine.Engine)
-	mux.HandleFunc("/api/scan", handleScan)
+	mux.HandleFunc("/api/scan", func(w http.ResponseWriter, r *http.Request) { handleScan(w, r, addr, path) })
 
-	serverAddr := "127.0.0.1:" + port
-	fmt.Printf("\n=======================================================\n")
-	fmt.Printf(" [:: NUQS LIVE AUDIT WORKBENCH SERVER RUNNING]\n")
-	fmt.Printf("=======================================================\n")
-	fmt.Printf(" Local URL: http://%s\n", serverAddr)
-	fmt.Printf(" Design Lab Dir: %s\n", designsPath)
-	fmt.Printf(" Engine Modules: %d registered security checks\n", len(checks.All()))
-	fmt.Printf(" Real-time Nmap Integration: ACTIVE\n")
-	fmt.Printf(" Press Ctrl+C to stop.\n\n")
-
-	if err := http.ListenAndServe(serverAddr, mux); err != nil {
+	log.Printf("Nuqs UI prototype at http://%s", addr)
+	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatalf("server terminated: %v", err)
 	}
 }
 
-func handleScan(w http.ResponseWriter, r *http.Request) {
+func handleScan(w http.ResponseWriter, r *http.Request, addr, path string) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	var req ScanRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
+	if r.Host != addr || r.Header.Get("Origin") != "http://"+addr {
+		http.Error(w, "Open the scan page on the local server.", http.StatusForbidden)
 		return
 	}
-
-	targetStr := strings.TrimSpace(req.Target)
-	if targetStr == "" {
-		targetStr = "127.0.0.1"
+	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil || mediaType != "application/json" {
+		http.Error(w, "Expected application/json.", http.StatusUnsupportedMediaType)
+		return
 	}
-
+	var req ScanRequest
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil || !errors.Is(decoder.Decode(&struct{}{}), io.EOF) {
+		http.Error(w, "Invalid scan settings.", http.StatusBadRequest)
+		return
+	}
+	targetStr := strings.TrimSpace(req.Target)
 	limit := int64(target.DefaultLimit)
 	if req.Force {
 		limit = 0
@@ -171,18 +181,32 @@ func handleScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	workers := req.Workers
-	if workers < 1 {
-		workers = engine.DefaultWorkers
-	}
-
-	timeout := engine.DefaultCheckTimeout
-	if req.Timeout != "" {
-		if d, err := time.ParseDuration(req.Timeout); err == nil && d > 0 {
-			timeout = d
+	for i, spec := range targets {
+		if spec == "localhost" {
+			targets[i] = "127.0.0.1"
+			continue
+		}
+		if !localTarget(spec) {
+			http.Error(w, "This prototype accepts IPv4 loopback targets only (127.0.0.0/8).", http.StatusBadRequest)
+			return
 		}
 	}
-
+	workers := req.Workers
+	if workers == 0 {
+		workers = engine.DefaultWorkers
+	}
+	if workers < 1 || workers > 128 {
+		http.Error(w, "Workers must be between 1 and 128.", http.StatusBadRequest)
+		return
+	}
+	timeout := engine.DefaultCheckTimeout
+	if req.Timeout != "" {
+		timeout, err = time.ParseDuration(req.Timeout)
+		if err != nil || timeout <= 0 {
+			http.Error(w, "Enter a positive timeout with a unit, such as 30s.", http.StatusBadRequest)
+			return
+		}
+	}
 	// Setup Server-Sent Events headers
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -204,7 +228,7 @@ func handleScan(w http.ResponseWriter, r *http.Request) {
 
 	eng := &engine.Engine{
 		Scanner: nmap.Scanner{
-			Runner: nmap.ExecRunner{Path: req.NmapPath},
+			Runner: nmap.ExecRunner{Path: path},
 			Options: nmap.Options{
 				Ports:    req.Ports,
 				SkipPing: req.SkipPing,
@@ -247,7 +271,7 @@ func handleScan(w http.ResponseWriter, r *http.Request) {
 	}
 
 	errMsg := ""
-	if runErr != nil && !errorsIsContext(runErr) {
+	if runErr != nil {
 		errMsg = runErr.Error()
 	}
 
@@ -258,6 +282,12 @@ func handleScan(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func errorsIsContext(err error) bool {
-	return strings.Contains(err.Error(), context.Canceled.Error()) || strings.Contains(err.Error(), "context deadline exceeded")
+// localTarget accepts parsed IPv4 addresses, last-octet ranges and entire prefixes inside loopback.
+func localTarget(spec string) bool {
+	if prefix, err := netip.ParsePrefix(spec); err == nil {
+		return prefix.Addr().Is4() && prefix.Addr().IsLoopback() && prefix.Bits() >= 8
+	}
+	first, _, _ := strings.Cut(spec, "-")
+	ip, err := netip.ParseAddr(first)
+	return err == nil && ip.Is4() && ip.IsLoopback()
 }
