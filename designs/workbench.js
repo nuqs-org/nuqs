@@ -33,18 +33,68 @@ function applyAppearance() {
 applyAppearance();
 appearance.addEventListener("change", applyAppearance);
 
-function openAccount(title, message) {
-  byId("accountTitle").textContent = title;
-  byId("accountNote").textContent = message;
-  byId("accountDialog").showModal();
+const narrowWindow = matchMedia("(max-width: 740px)");
+function sidebarKey() {
+  return narrowWindow.matches ? "nuqs:compact-mobile" : "nuqs:compact";
 }
-byId("login").onclick = () => openAccount("Log in", "This prototype runs on your device. Account login is not connected yet.");
-byId("signup").onclick = () => openAccount("Sign up", "Account registration is not available in the local prototype. You can use the workspace without an account.");
+function setCompact(compact) {
+  document.documentElement.classList.toggle("compactRail", compact);
+  const button = byId("railToggle");
+  button.setAttribute("aria-expanded", String(!compact));
+  button.title = compact ? "Expand sidebar" : "Collapse sidebar";
+  button.setAttribute("aria-label", button.title);
+}
+function restoreSidebar() {
+  const stored = read(sidebarKey());
+  setCompact(typeof stored === "boolean" ? stored : narrowWindow.matches);
+}
+restoreSidebar();
+narrowWindow.addEventListener("change", restoreSidebar);
+byId("railToggle").onclick = () => {
+  const compact = !document.documentElement.classList.contains("compactRail");
+  setCompact(compact);
+  save(sidebarKey(), compact);
+};
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && narrowWindow.matches && !byId("profileDialog").open &&
+      !document.documentElement.classList.contains("compactRail")) {
+    setCompact(true);
+    byId("railToggle").focus();
+  }
+});
+function showProfile(value) {
+  const name = typeof value === "string" && value.trim() ? value.trim().slice(0,40) : "Local user";
+  byId("profileName").textContent = name;
+  byId("initials").textContent = name.split(/\s+/u).slice(0,2).map(word => Array.from(word)[0]).join("").toLocaleUpperCase();
+  byId("profileButton").title = "Edit profile · " + name;
+  byId("profileButton").setAttribute("aria-label", byId("profileButton").title);
+}
+showProfile(read("nuqs:display-name"));
+byId("profileButton").onclick = () => {
+  byId("displayName").value = byId("profileName").textContent;
+  byId("displayName").setCustomValidity("");
+  byId("profileDialog").showModal();
+};
+byId("displayName").oninput = () => byId("displayName").setCustomValidity("");
+byId("cancelProfile").onclick = () => byId("profileDialog").close();
+byId("profileForm").onsubmit = event => {
+  event.preventDefault();
+  const input = byId("displayName");
+  const name = input.value.trim();
+  if (!name || !save("nuqs:display-name", name)) {
+    input.setCustomValidity(name ? "Browser storage is unavailable." : "Enter a display name.");
+    input.reportValidity();
+    return;
+  }
+  showProfile(name);
+  byId("profileDialog").close();
+};
 
 let catalog = [];
 let libraryRequest = 0;
 
 function navigate(page, fresh = false) {
+  if (narrowWindow.matches) setCompact(true);
   const reportOnly = page === "report";
   const hasReport = Boolean(current);
   byId("scanPage").hidden = page === "checks" || (reportOnly && !hasReport);

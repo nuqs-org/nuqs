@@ -2,10 +2,11 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Nuqs · Scan workspace</title><link rel="stylesheet" href="workbench.css"><script defer src="workbench.js"></script></head>
-<body><aside class="rail"><div class="brand"><i aria-hidden="true"></i>nuqs</div><span class="connection" id="connection">Connecting…</span>
-<nav aria-label="Workspace">
-<button id="scanTab" aria-current="page"><svg aria-hidden="true" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5M7 10h6m-3-3v6"/></svg><span class="wideLabel">Scan console</span><span class="shortLabel">Scan</span></button><button id="checksTab"><svg aria-hidden="true" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m6 9 1 1 2-2m2 1h6m-11 6 1 1 2-2m2 1h6"/></svg><span class="wideLabel">Check library</span><span class="shortLabel">Checks</span></button>
-<button id="reportTab"><svg aria-hidden="true" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 3h9l5 5v13H5zM14 3v6h5M8 13h8m-8 4h6"/></svg><span class="wideLabel">Latest report</span><span class="shortLabel">Report</span></button></nav><div class="railFoot"><button id="login" type="button" aria-haspopup="dialog">Log in</button><button id="signup" type="button" aria-haspopup="dialog">Sign up</button></div></aside>
+<body><aside class="rail"><div class="railHead"><div class="brand"><i aria-hidden="true"></i><span>nuqs</span></div>
+<button type="button" id="railToggle" aria-controls="workspaceNav" aria-expanded="true" aria-label="Collapse sidebar"><svg aria-hidden="true" viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="4"/><path d="M9 4v16m7-10-2 2 2 2"/></svg></button></div><span class="connection" id="connection">Connecting…</span>
+<nav id="workspaceNav" aria-label="Workspace">
+<button id="scanTab" aria-label="Scan console" title="Scan console" aria-current="page"><svg aria-hidden="true" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5M7 10h6m-3-3v6"/></svg><span class="wideLabel">Scan console</span><span class="shortLabel">Scan</span></button><button id="checksTab" aria-label="Check library" title="Check library"><svg aria-hidden="true" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m6 9 1 1 2-2m2 1h6m-11 6 1 1 2-2m2 1h6"/></svg><span class="wideLabel">Check library</span><span class="shortLabel">Checks</span></button>
+<button id="reportTab" aria-label="Latest report" title="Latest report"><svg aria-hidden="true" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 3h9l5 5v13H5zM14 3v6h5M8 13h8m-8 4h6"/></svg><span class="wideLabel">Latest report</span><span class="shortLabel">Report</span></button></nav><div class="railFoot"><button id="profileButton" type="button" aria-haspopup="dialog" aria-label="Edit local profile"><span class="avatar" aria-hidden="true" id="initials">LU</span><span id="profileName">Local user</span></button></div></aside>
 <header class="top"><span>Workspace <b>/</b> <strong id="crumb">Scan console</strong></span><span class="localAddress">127.0.0.1</span></header>
 <main><section id="scanPage"><div class="workgrid"><section class="launch" aria-labelledby="launchTitle">
 <h1 id="launchTitle">New scan</h1><p id="activeTarget" hidden></p>
@@ -31,6 +32,10 @@ RUN</button>
 <div><dt>Port selection</dt><dd id="profilePorts">Top 1000</dd></div><div><dt>Host discovery</dt><dd id="discovery">Enabled</dd></div>
 <div><dt>Check timeout</dt><dd id="profileTimeout">30s</dd></div><div><dt>Concurrency</dt><dd id="profileWorkers">10 workers</dd></div></dl></aside><section id="inventory"><div class="heading"><h2>Registered checks</h2><button id="openLibrary">View library →</button></div><div id="inventoryRows" aria-live="polite">Loading checks…</div></section></div>
 </section><section id="reportEmpty" hidden><div class="pageHead"><h1>Latest report</h1><p>Your most recent completed report on this device.</p></div><article><h2>No saved report</h2><p>Run a scan to see its findings, evidence, and check errors here.</p><button id="backScan">Go to scan console</button></article></section><section id="checksPage" hidden><div class="pageHead"><h1>Check library</h1><p>Browse the checks available in this engine.</p></div><label class="searchLabel">Filter checks<input type="search" id="checkSearch" placeholder="Search by check, service or severity"></label><div id="catalog" aria-live="polite"></div></section></main>
-<dialog id="accountDialog" aria-labelledby="accountTitle" aria-describedby="accountNote">
-<h2 id="accountTitle">Log in</h2><p id="accountNote"></p>
-<form method="dialog"><button autofocus>Back to workspace</button></form></dialog></body></html>
+<dialog id="profileDialog" aria-labelledby="profileTitle">
+<h2 id="profileTitle">Local profile</h2>
+<form id="profileForm"><label for="displayName">Display name</label>
+<input id="displayName" maxlength="40" required autocomplete="off" aria-describedby="profileHint">
+<small id="profileHint">Saved in this browser.</small>
+<div class="dialogActions"><button type="button" id="cancelProfile">Cancel</button><button type="submit">Save</button></div>
+</form></dialog></body></html>
