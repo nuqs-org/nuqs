@@ -22,13 +22,13 @@
 <h1 id="launchTitle">New scan</h1><p id="activeTarget" hidden></p>
 <form id="scanForm"><fieldset id="settings">
 <div class="scanStage"><div class="targetEntry"><label for="target">Target</label>
-<div class="targetLens"><input id="target" required placeholder="127.0.0.1" aria-describedby="scope"></div>
+<div class="fieldLens"><input id="target" required placeholder="127.0.0.1" aria-describedby="scope"></div>
 <small id="scope">Use localhost or a range within 127.0.0.0/8.</small></div>
 <button class="primary scanOrb" type="submit">
 RUN</button></div>
 <details><summary>Scan options</summary><div class="options"><div class="optionFields">
-<label>Ports<input id="ports" placeholder="Top 1000 ports"></label><label>Check timeout<input id="timeout" value="30s" pattern=".*\S.*" title="Enter a positive duration such as 30s." required></label>
-<label>Concurrent checks<input id="workers" type="number" min="1" max="128" value="10" required></label></div>
+<label>Ports<span class="fieldLens"><input id="ports" placeholder="Top 1000 ports"></span></label><label>Check timeout<span class="fieldLens"><input id="timeout" value="30s" pattern=".*\S.*" title="Enter a positive duration such as 30s." required></span></label>
+<label>Concurrent checks<span class="fieldLens"><input id="workers" type="number" min="1" max="128" value="10" required></span></label></div>
 <div class="optionFlags"><label class="option"><input type="checkbox" id="skipPing">Skip host discovery <code>-Pn</code></label>
 <label class="option"><input type="checkbox" id="force">Allow over 1024 addresses <code>--force</code></label></div></div></details></fieldset></form>
 <div class="scanFeedback"><p id="scanPhase" role="status"></p><span id="checkCount" hidden></span><span id="elapsed" aria-hidden="true" hidden></span>
@@ -41,7 +41,7 @@ RUN</button></div>
 <div class="referenceGrid"><aside class="profile"><div class="panelTitle"><svg aria-hidden="true" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 2v3m6-3v3M9 19v3m6-3v3M2 9h3m-3 6h3m14-6h3m-3 6h3"/></svg><h2>Scan profile</h2></div><dl><div><dt>Engine</dt><dd id="runner">—</dd></div>
 <div><dt>Port selection</dt><dd id="profilePorts">Top 1000</dd></div><div><dt>Host discovery</dt><dd id="discovery">Enabled</dd></div>
 <div><dt>Check timeout</dt><dd id="profileTimeout">30s</dd></div><div><dt>Concurrency</dt><dd id="profileWorkers">10 workers</dd></div></dl></aside><section id="inventory"><div class="heading"><h2>Registered checks</h2><button id="openLibrary">View library →</button></div><div id="inventoryRows" aria-live="polite">Loading checks…</div></section></div>
-</section><section id="reportEmpty" hidden><div class="pageHead"><h1>Latest report</h1><p>Your most recent completed report on this device.</p></div><article><h2>No saved report</h2><p>Run a scan to see its findings, evidence, and check errors here.</p><button id="backScan">Go to scan console</button></article></section><section id="checksPage" hidden><div class="pageHead"><h1>Check library</h1><p>Browse the checks available in this engine.</p></div><label class="searchLabel">Filter checks<input type="search" id="checkSearch" placeholder="Search by check, service or severity"></label><div id="catalog" aria-live="polite"></div></section></main>
+</section><section id="reportEmpty" hidden><div class="pageHead"><h1>Latest report</h1><p>Your most recent completed report on this device.</p></div><article><h2>No saved report</h2><p>Run a scan to see its findings, evidence, and check errors here.</p><button id="backScan">Go to scan console</button></article></section><section id="checksPage" hidden><div class="pageHead"><h1>Check library</h1><p>Browse the checks available in this engine.</p></div><label class="searchLabel">Filter checks<span class="fieldLens"><input type="search" id="checkSearch" placeholder="Search by check, service or severity"></span></label><div id="catalog" aria-live="polite"></div></section></main>
 <dialog id="profileDialog" aria-labelledby="profileTitle">
 <h2 id="profileTitle">Local profile</h2>
 <form id="profileForm"><label for="displayName">Display name</label>
