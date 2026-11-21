@@ -327,6 +327,27 @@ for (const surface of document.querySelectorAll(".rail,.workgrid,.top,.toolbar,.
 }
 
 byId("stop").onclick = () => controller?.abort();
+// Keep the native disclosure and keyboard behavior when layout animation is unavailable.
+const scanOptions = document.querySelector(".launch details");
+let optionsTransition;
+let requestedOpen;
+scanOptions.querySelector("summary").addEventListener("click", event => {
+  if (!document.startViewTransition || reduceEffects.matches) return;
+  event.preventDefault();
+  requestedOpen = !(optionsTransition ? requestedOpen : scanOptions.open);
+  optionsTransition?.skipTransition();
+  document.documentElement.classList.add("movingOptions");
+  const transition = document.startViewTransition(() => {
+    scanOptions.open = requestedOpen;
+  });
+  optionsTransition = transition;
+  transition.finished.finally(() => {
+    if (transition !== optionsTransition) return;
+    optionsTransition = null;
+    document.documentElement.classList.remove("movingOptions");
+  });
+});
+
 byId("scanForm").addEventListener("invalid", event => {
   if (event.target.closest("details")) event.target.closest("details").open = true;
 }, true);

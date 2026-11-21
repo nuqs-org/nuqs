@@ -425,3 +425,21 @@ main:has(> #scanPage:not([hidden],.reportOnly)) {
 }
 .launch details summary:focus-visible {outline-offset:-4px}
 .launch details[open] .options {margin:0 var(--launch-inset) var(--launch-inset)}
+
+/* Move the actual layout landmarks together and crossfade the two lower panels. */
+@media(prefers-reduced-motion:no-preference) {
+  :root.movingOptions {view-transition-name:none}
+  .movingOptions .workgrid {view-transition-name:scan-surface}
+  .movingOptions #launchTitle {view-transition-name:scan-title}
+  .movingOptions .targetEntry {view-transition-name:scan-target}
+  .movingOptions .scanOrb {view-transition-name:scan-run}
+  .movingOptions .launch summary {view-transition-name:scan-disclosure}
+  .movingOptions details[open] .options {view-transition-name:scan-settings}
+  .movingOptions .referenceGrid {view-transition-name:scan-references}
+  .movingOptions::view-transition {pointer-events:none}
+  .movingOptions::view-transition-group(*) {
+    animation-duration:260ms;animation-timing-function:cubic-bezier(.22,.78,.24,1)
+  }
+  .movingOptions::view-transition-old(scan-settings),
+  .movingOptions::view-transition-old(scan-references) {animation-duration:110ms}
+}
