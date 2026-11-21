@@ -26,3 +26,7 @@ and Stop action. The circular control reads RUN. Its adjacent feedback shows com
 checks when available. Only phase changes enter the live region. Completion opens and focuses
 the report if the scan page is visible. Someone browsing the check library stays
 there. On phones, the expanded rail overlays the workspace.
+
+The web glass material has a clear center and a narrow reflective edge. The
+edge uses SVG displacement where supported and a CSS highlight elsewhere.
+Inputs, severity labels, and report actions use the same monochrome treatment.

@@ -146,13 +146,6 @@ pre {white-space:pre-wrap;overflow-wrap:anywhere;background:var(--panel);padding
   border:1px solid var(--glass-edge);
   box-shadow:inset 0 1px var(--glass-shine),0 5px 16px #00000010;
 }
-@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
-  :is(.rail,.workgrid,.profile,#inventory,article,dialog) {
-    background-color:var(--glass-tint);
-    -webkit-backdrop-filter:blur(16px) saturate(1.12);
-    backdrop-filter:blur(16px) saturate(1.12);
-  }
-}
 @media(min-width:741px){
   .rail {top:8px;bottom:8px;left:8px;width:calc(var(--sidebar) - 10px);border-radius:19px;overflow-y:auto}
 }
@@ -200,9 +193,6 @@ main,.top {margin-left:var(--rail-width)}
   background-color:var(--glass-base);
   background-image:linear-gradient(112deg,#f5f5f528 0%,transparent 22%,#a9a9a918 80%,#eaeaea30);
   box-shadow:inset 1px 1px 1px #ffffff60,inset -1px -1px 2px #c5c5c530,0 6px 18px #1010101a}
-@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
-  .rail {background-color:var(--glass-tint);-webkit-backdrop-filter:blur(24px) saturate(1.4);backdrop-filter:blur(24px) saturate(1.4)}
-}
 .railHead {display:flex;align-items:center;justify-content:space-between;gap:4px}
 #railToggle {display:grid;place-items:center;height:36px;width:36px;flex:none;padding:0;border-color:transparent;background:transparent;color:var(--sub)}
 #railToggle:hover {background:var(--selected);color:var(--accent)}
@@ -256,25 +246,24 @@ body {accent-color:var(--text)}
 /* Two material depths: thick navigation glass and shallow content trays. */
 :root {
   --bg:#171717;
-  --liquid-fill:rgba(59,59,59,.72);
-  --liquid-control:rgba(108,108,108,.48);
+  --liquid-fill:rgba(255,255,255,.065);
+  --liquid-control:rgba(255,255,255,.13);
   --liquid-rim:rgba(255,255,255,.33);
   --liquid-light:rgba(255,255,255,.54);
   --liquid-shadow:rgba(0,0,0,.36);
 }
 :root.light {
   --bg:#dedede;
-  --liquid-fill:rgba(253,253,253,.55);
-  --liquid-control:rgba(255,255,255,.68);
+  --liquid-fill:rgba(255,255,255,.22);
+  --liquid-control:rgba(255,255,255,.40);
   --liquid-rim:rgba(255,255,255,.83);
   --liquid-light:white;
   --liquid-shadow:rgba(0,0,0,.14);
 }
 .rail,.workgrid,.profile,#inventory,article,dialog,.top,.toolbar {
   border:1px solid var(--liquid-rim);
-  background-color:var(--glass-base);
-  background-image:linear-gradient(135deg,var(--glass-shine),transparent 38%),
-    linear-gradient(340deg,var(--glass-shine),transparent 22%);
+  background-color:var(--liquid-fill);
+  background-image:linear-gradient(154deg,#ffffff19 0%,transparent 20%,transparent 79%,#ffffff13 100%);
   box-shadow:inset 1px 1.5px 1px var(--liquid-light),inset -1px -1px 2px #00000026,
     0 8px 22px -9px var(--liquid-shadow);
 }
@@ -309,11 +298,6 @@ body {accent-color:var(--text)}
 }
 .scanOrb::after {border-color:var(--liquid-rim);box-shadow:0 1px 2px var(--liquid-light),inset 0 2px 3px #0002}
 .scanOrb:disabled::after {border-top-color:var(--text)}
-@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
-  .rail,.workgrid,.profile,#inventory,dialog,.top,.toolbar {
-    background-color:var(--liquid-fill);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)
-  }
-}
 @media(prefers-reduced-motion:no-preference) {
   #workspaceNav::before {transition:transform 240ms cubic-bezier(.22,.88,.28,1)}
   :is(.launch summary,.copy,#download,#stop,.dialogActions button):active {transform:scale(.97)}
@@ -335,5 +319,41 @@ body {accent-color:var(--text)}
       background:radial-gradient(180px circle at var(--reflection-x,12%) var(--reflection-y,0%),#fff,transparent);
       mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;
     }
+  }
+}
+
+/* A thin optical rim samples the background; the clear middle stays sharp. */
+.profile,#inventory,article,.options {position:relative}
+@supports (mask-composite:exclude) {
+  :is(.rail,.top,.workgrid,.profile,#inventory,article,dialog,.toolbar,.options)::before {
+    content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;padding:3px;
+    background:conic-gradient(from 28deg,transparent 7%,#fff9 17%,#0003 31%,transparent 43%,#fffa 62%,#0002 79%,#fff9 90%,transparent);
+    mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;
+    -webkit-backdrop-filter:contrast(1.12);backdrop-filter:contrast(1.12);
+  }
+  @supports (backdrop-filter:url("#liquid-rim")){
+    :is(.rail,.top,.workgrid,.profile,#inventory,article,dialog,.toolbar,.options)::before {
+      backdrop-filter:url("#liquid-rim") contrast(1.12);
+    }
+  }
+}
+/* A denser neutral tint keeps text readable when a surface floats over content. */
+.rail,.top,dialog {background-color:color-mix(in srgb,var(--glass-base) 86%,transparent)}
+.targetEntry input,.optionFields input:not([type=checkbox]),.searchLabel input,#displayName,#raw {
+  background:linear-gradient(180deg,#0000000d,transparent 6px),var(--liquid-fill);
+  border:1px solid var(--glass-edge);border-radius:12px;
+  box-shadow:inset 0 1px 2px #0002,0 1px 1px #ffffff50;
+}
+#raw {padding:16px}
+.badge:not(.high,.critical),#backScan,#openLibrary,.scanFeedback:has(#scanPhase:not(:empty)){
+  background:linear-gradient(164deg,#ffffff30,transparent 45%,#ffffff15),var(--liquid-control);
+  border:1px solid var(--liquid-rim);box-shadow:inset 0 1px 1px var(--liquid-light),0 1px 3px var(--liquid-shadow);
+}
+#openLibrary,#backScan {border-radius:18px;padding:5px 12px;color:var(--text)}
+.checkRow.head {background:var(--liquid-fill)}
+@media(prefers-reduced-transparency:reduce),(prefers-contrast:more) {
+  :is(.rail,.top,.workgrid,.profile,#inventory,article,dialog,.toolbar,.options)::before {display:none}
+  :is(.rail,.top,dialog,#raw,#backScan,#openLibrary,#displayName,.searchLabel input,.targetEntry input,.optionFields input:not([type=checkbox]),.badge:not(.high,.critical),.scanFeedback:has(#scanPhase:not(:empty))) {
+    background:var(--panel);box-shadow:none
   }
 }

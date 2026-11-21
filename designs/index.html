@@ -2,7 +2,14 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="nuqs-logo.png" type="image/png"><title>Nuqs · Scan workspace</title><link rel="stylesheet" href="workbench.css"><script defer src="workbench.js"></script></head>
-<body><aside class="rail"><div class="railHead"><img class="brand" src="nuqs-logo.png" width="72" height="72" alt="Nuqs">
+<body>
+<!-- The lens samples the backdrop along the rim. Labels are drawn above it. -->
+<svg aria-hidden="true" focusable="false" width="0" height="0" style="position:absolute">
+  <defs><filter id="liquid-rim" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+    <feImage href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJ4Ij48c3RvcCBzdG9wLWNvbG9yPSIjMDA4MDgwIi8+PHN0b3Agb2Zmc2V0PSIuMTYiIHN0b3AtY29sb3I9IiM4MDgwODAiLz48c3RvcCBvZmZzZXQ9Ii44NCIgc3RvcC1jb2xvcj0iIzgwODA4MCIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iI2ZmODA4MCIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJ5IiB4Mj0iMCIgeTI9IjEiPjxzdG9wIHN0b3AtY29sb3I9IiM4MDAwODAiLz48c3RvcCBvZmZzZXQ9Ii4xNiIgc3RvcC1jb2xvcj0iIzgwODA4MCIgc3RvcC1vcGFjaXR5PSIwIi8+PHN0b3Agb2Zmc2V0PSIuODQiIHN0b3AtY29sb3I9IiM4MDgwODAiIHN0b3Atb3BhY2l0eT0iMCIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzgwZmY4MCIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI3gpIi8+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9InVybCgjeSkiLz48L3N2Zz4=" preserveAspectRatio="none" result="normals"/>
+    <feDisplacementMap in="SourceGraphic" in2="normals" scale="14" xChannelSelector="R" yChannelSelector="G"/>
+  </filter></defs>
+</svg><aside class="rail"><div class="railHead"><img class="brand" src="nuqs-logo.png" width="72" height="72" alt="Nuqs">
 <button type="button" id="railToggle" aria-controls="workspaceNav" aria-expanded="true" aria-label="Collapse sidebar"><svg aria-hidden="true" viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="4"/><path d="M9 4v16m7-10-2 2 2 2"/></svg></button></div><span class="connection" id="connection">Connecting…</span>
 <nav id="workspaceNav" aria-label="Workspace">
 <button id="scanTab" aria-label="Scan console" title="Scan console" aria-current="page"><svg aria-hidden="true" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5M7 10h6m-3-3v6"/></svg><span class="wideLabel">Scan console</span><span class="shortLabel">Scan</span></button><button id="checksTab" aria-label="Check library" title="Check library"><svg aria-hidden="true" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m6 9 1 1 2-2m2 1h6m-11 6 1 1 2-2m2 1h6"/></svg><span class="wideLabel">Check library</span><span class="shortLabel">Checks</span></button>
