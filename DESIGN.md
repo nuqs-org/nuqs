@@ -4,7 +4,7 @@ The local prototype in `designs/` explores the scan form, checks catalog and rep
 before the production implementation in [the web UI plan](docs/ui/building.md).
 
 Start with the target field. Keep less common settings under Scan options. Use a
-single action color in both themes and reserve severity colors for report data.
+monochrome palette in both themes. Label every severity level explicitly.
 Use real engine progress and report timestamps so fast scans can finish immediately.
 Show the target and finish time with every report, including after a refresh.
 Present severity counts first, followed by findings with their endpoint, evidence
@@ -15,7 +15,7 @@ library and latest report. The scan profile reflects current form values and the
 registered-check inventory comes from the engine. On narrow screens navigation starts as an icon rail and the profile sits below scan configuration.
 
 A plain canvas supports glass panels with a lightly tinted rim. The full-height
-blue navigation rail holds an editable local profile at its foot and collapses to icons. Appearance follows the system setting. Display headings use Avenir Next with sans-serif fallbacks. Body text uses the system sans serif. Increased contrast and reduced transparency use solid panels.
+monochrome navigation rail holds an editable local profile at its foot and collapses to icons. Appearance follows the system setting. Display headings use Avenir Next with sans-serif fallbacks. Body text uses the system sans serif. Increased contrast and reduced transparency use solid panels.
 
 New scan anchors the console. Align the target field, circular submit control
 and options disclosure on a shared centerline. Show the busy label and ring
