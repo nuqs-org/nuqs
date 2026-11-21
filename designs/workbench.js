@@ -297,22 +297,25 @@ async function receive(response) {
 
 const scanButton = document.querySelector(".scanOrb");
 const reduceEffects = window.matchMedia("(prefers-reduced-motion: reduce), (prefers-reduced-transparency: reduce), (prefers-contrast: more)");
-function reflectContact(event) {
-  if (scanButton.disabled || reduceEffects.matches) return;
-  const bounds = scanButton.getBoundingClientRect();
-  scanButton.style.setProperty("--reflection-x", (event.clientX - bounds.left) / bounds.width * 100 + "%");
-  scanButton.style.setProperty("--reflection-y", (event.clientY - bounds.top) / bounds.height * 100 + "%");
+// Highlight the nearest glass edge without changing the contrast of its contents.
+for (const surface of document.querySelectorAll(".rail,.workgrid,.top,.toolbar,.scanOrb")) {
+  function reflectContact(event) {
+    if (surface.disabled || reduceEffects.matches) return;
+    const bounds = surface.getBoundingClientRect();
+    surface.style.setProperty("--reflection-x", (event.clientX - bounds.left) / bounds.width * 100 + "%");
+    surface.style.setProperty("--reflection-y", (event.clientY - bounds.top) / bounds.height * 100 + "%");
+  }
+  function resetReflection() {
+    surface.style.removeProperty("--reflection-x");
+    surface.style.removeProperty("--reflection-y");
+  }
+  surface.addEventListener("pointermove", reflectContact);
+  surface.addEventListener("pointerdown", reflectContact);
+  surface.addEventListener("pointerleave", resetReflection);
+  surface.addEventListener("pointerup", resetReflection);
+  surface.addEventListener("pointercancel", resetReflection);
+  reduceEffects.addEventListener("change", resetReflection);
 }
-function resetReflection() {
-  scanButton.style.removeProperty("--reflection-x");
-  scanButton.style.removeProperty("--reflection-y");
-}
-scanButton.addEventListener("pointermove", reflectContact);
-scanButton.addEventListener("pointerdown", reflectContact);
-scanButton.addEventListener("pointerleave", resetReflection);
-scanButton.addEventListener("pointerup", resetReflection);
-scanButton.addEventListener("pointercancel", resetReflection);
-reduceEffects.addEventListener("change", resetReflection);
 
 byId("stop").onclick = () => controller?.abort();
 byId("scanForm").addEventListener("invalid", event => {

@@ -252,3 +252,88 @@ body {accent-color:var(--text)}
 .badge.high,.badge.critical {background:var(--text);color:var(--bg);border-color:var(--text)}
 .badge.critical {font-weight:800}
 ::selection {background:var(--text);color:var(--bg)}
+
+/* Two material depths: thick navigation glass and shallow content trays. */
+:root {
+  --bg:#171717;
+  --liquid-fill:rgba(59,59,59,.72);
+  --liquid-control:rgba(108,108,108,.48);
+  --liquid-rim:rgba(255,255,255,.33);
+  --liquid-light:rgba(255,255,255,.54);
+  --liquid-shadow:rgba(0,0,0,.36);
+}
+:root.light {
+  --bg:#dedede;
+  --liquid-fill:rgba(253,253,253,.55);
+  --liquid-control:rgba(255,255,255,.68);
+  --liquid-rim:rgba(255,255,255,.83);
+  --liquid-light:white;
+  --liquid-shadow:rgba(0,0,0,.14);
+}
+.rail,.workgrid,.profile,#inventory,article,dialog,.top,.toolbar {
+  border:1px solid var(--liquid-rim);
+  background-color:var(--glass-base);
+  background-image:linear-gradient(135deg,var(--glass-shine),transparent 38%),
+    linear-gradient(340deg,var(--glass-shine),transparent 22%);
+  box-shadow:inset 1px 1.5px 1px var(--liquid-light),inset -1px -1px 2px #00000026,
+    0 8px 22px -9px var(--liquid-shadow);
+}
+.rail,.workgrid,dialog {border-radius:28px}
+.profile,#inventory,article {border-radius:19px}
+.top {
+  position:sticky;top:10px;z-index:1;margin:12px var(--gutter) 0 calc(var(--rail-width) + var(--gutter));
+  min-height:42px;padding:8px 18px;border-radius:24px;
+}
+.toolbar {margin:10px 0;padding:8px 12px;border-radius:17px}
+.options,.light .options {background:linear-gradient(145deg,var(--glass-shine),transparent 50%),var(--selected);
+  border-color:var(--liquid-rim);border-radius:17px;box-shadow:inset 0 1px 1px var(--liquid-light),0 2px 8px var(--liquid-shadow)}
+.launch summary,.toolbar button,.toolbar select,.copy,#download,#stop,.dialogActions button {
+  border:1px solid var(--liquid-rim);border-radius:999px;color:var(--text);
+  background:linear-gradient(165deg,var(--glass-shine),transparent 55%),var(--liquid-control);
+  box-shadow:inset 0 1px 1px var(--liquid-light),0 2px 5px var(--liquid-shadow);
+}
+#workspaceNav {position:relative;isolation:isolate;--selected-row:0}
+#workspaceNav:has(#checksTab[aria-current]) {--selected-row:1}
+#workspaceNav:has(#reportTab[aria-current]) {--selected-row:2}
+#workspaceNav::before {
+  content:"";position:absolute;z-index:-1;inset:0 0 auto;height:42px;box-sizing:border-box;
+  transform:translateY(calc(var(--selected-row) * 47px));border-radius:20px;border:1px solid var(--liquid-rim);
+  background:linear-gradient(155deg,var(--glass-shine),transparent 64%),var(--liquid-control);
+  box-shadow:inset 1px 1px 2px var(--liquid-light),inset -1px -1px 2px #0002,0 3px 6px #0001;
+}
+#workspaceNav button {height:42px;border-radius:20px;white-space:nowrap}
+#workspaceNav [aria-current] {color:var(--text);font-weight:650;background:transparent}
+.scanOrb {
+  border-color:#fffc;box-shadow:inset 1px 3px 3px #fff,inset -2px -5px 8px #39393970,
+    inset 0 0 0 4px #ffffff48,0 6px 14px -3px #0005;
+}
+.scanOrb::after {border-color:var(--liquid-rim);box-shadow:0 1px 2px var(--liquid-light),inset 0 2px 3px #0002}
+.scanOrb:disabled::after {border-top-color:var(--text)}
+@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
+  .rail,.workgrid,.profile,#inventory,dialog,.top,.toolbar {
+    background-color:var(--liquid-fill);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)
+  }
+}
+@media(prefers-reduced-motion:no-preference) {
+  #workspaceNav::before {transition:transform 240ms cubic-bezier(.22,.88,.28,1)}
+  :is(.launch summary,.copy,#download,#stop,.dialogActions button):active {transform:scale(.97)}
+}
+@media(prefers-reduced-transparency:reduce),(prefers-contrast:more){
+  :is(.rail,.workgrid,.profile,#inventory,article,dialog,.top,.toolbar,.options,.launch summary,.toolbar button,.toolbar select,.copy,#download,#stop,.dialogActions button,#workspaceNav::before) {
+    background:var(--panel);border-color:var(--line);box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none
+  }
+  #workspaceNav [aria-current] {background:var(--selected);border-color:var(--accent)}
+  .light .options {background:var(--panel)}
+  .scanOrb,.scanOrb::after {box-shadow:none}
+}
+
+.workgrid,.toolbar {position:relative}
+@supports (mask-composite:exclude){
+  @media(prefers-reduced-motion:no-preference) and (prefers-contrast:no-preference) and (prefers-reduced-transparency:no-preference){
+    :is(.rail,.workgrid,.top,.toolbar)::after {
+      content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;padding:2px;
+      background:radial-gradient(180px circle at var(--reflection-x,12%) var(--reflection-y,0%),#fff,transparent);
+      mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;
+    }
+  }
+}
