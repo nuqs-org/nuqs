@@ -57,10 +57,29 @@ input:not([type=checkbox]) {display:block;width:100%;min-width:0;border-radius:8
 .scanOrb::after {content:"";position:absolute;inset:-6px;border:1px solid #dddddd77;border-radius:50%;pointer-events:none}
 .scanOrb svg {width:27px;height:27px}
 .scanOrb:disabled::after {border-top:2px solid #f1f1f1}
-.launch details {width:min(640px,100%);margin:auto}
-.launch summary {color:#f9f9f9;background:#292929ed;border:1px solid #848484;border-radius:30px;width:max-content;margin:0 auto;padding:4px 12px;font-size:12px}
-.options {background:#2a2a2a;color:#f5f5f5;border:1px solid #686868;border-radius:12px;padding:16px;margin:14px 0 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(150px,100%),1fr));gap:14px;text-align:left}
-.options input:not([type=checkbox]) {margin-top:4px;background:#212121;color:#ffffff}.options small {color:#d5d5d5}
+.launch details {width:min(600px,100%);margin-inline:auto}
+.launch summary {
+  display:flex;align-items:center;gap:9px;width:fit-content;min-height:34px;
+  margin:auto;padding:4px 14px;color:var(--text);font-size:13px;font-weight:600;
+  border:1px solid var(--line);border-radius:20px;background:var(--panel);list-style:none
+}
+.launch summary::-webkit-details-marker {display:none}
+.launch summary::after {
+  content:"";width:6px;height:6px;margin-top:-3px;border:solid currentColor;
+  border-width:0 1.5px 1.5px 0;transform:rotate(45deg)
+}
+.launch details[open] summary::after {margin-top:3px;transform:rotate(225deg)}
+.options {text-align:left;margin-top:16px;padding:16px 0 0;border-top:1px solid var(--line)}
+.optionFields {display:grid;grid-template-columns:minmax(0,1.4fr) repeat(2,minmax(0,1fr));gap:14px}
+.optionFields input:not([type=checkbox]) {margin-top:5px;font:14px/1.4 var(--mono);background:var(--field);color:var(--text)}
+.optionFields input::placeholder {color:var(--sub)}
+.optionFlags {margin-top:14px;border-top:1px solid var(--rule)}
+.optionFlags .option {display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;
+  min-height:40px;gap:10px;cursor:pointer;color:var(--text);font-size:14px;font-weight:450}
+.optionFlags .option + .option {border-top:1px solid var(--rule)}
+.optionFlags input {margin:0;width:16px;height:16px;cursor:pointer}
+.optionFlags code {font:12px var(--mono);color:var(--sub);white-space:nowrap}
+@media(max-width:620px){.optionFields {grid-template-columns:1fr;gap:10px}}
 .scanFeedback {display:grid;justify-items:center;gap:6px}
 .scanFeedback:has(#scanPhase:not(:empty)) {margin-top:12px;background:#1f1f1fed;border-radius:12px;padding:10px;width:fit-content;max-width:100%;margin-inline:auto}
 #elapsed,#activeTarget {font:13px var(--mono);overflow-wrap:anywhere}

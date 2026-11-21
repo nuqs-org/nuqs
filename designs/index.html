@@ -16,11 +16,11 @@
 <small id="scope">Use localhost or a range within 127.0.0.0/8.</small></div>
 <button class="primary scanOrb" type="submit">
 RUN</button>
-<details><summary>Scan options</summary><div class="options">
+<details><summary>Scan options</summary><div class="options"><div class="optionFields">
 <label>Ports<input id="ports" placeholder="Top 1000 ports"></label><label>Check timeout<input id="timeout" value="30s" required></label>
-<label>Concurrent checks<input id="workers" type="number" min="1" max="128" value="10" required></label>
-<label class="option"><input type="checkbox" id="skipPing">Skip host discovery <small>(-Pn)</small></label>
-<label class="option"><input type="checkbox" id="force">Allow over 1024 addresses <small>(--force)</small></label></div></details></fieldset></form>
+<label>Concurrent checks<input id="workers" type="number" min="1" max="128" value="10" required></label></div>
+<div class="optionFlags"><label class="option"><input type="checkbox" id="skipPing">Skip host discovery <code>-Pn</code></label>
+<label class="option"><input type="checkbox" id="force">Allow over 1024 addresses <code>--force</code></label></div></div></details></fieldset></form>
 <div class="scanFeedback"><p id="scanPhase" role="status"></p><span id="checkCount" hidden></span><span id="elapsed" aria-hidden="true" hidden></span>
 <button id="stop" type="button" hidden>Stop scan</button></div></section>
 </div>
