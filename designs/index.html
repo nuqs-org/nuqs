@@ -21,11 +21,11 @@
 <main><section id="scanPage"><div class="workgrid"><section class="launch" aria-labelledby="launchTitle">
 <h1 id="launchTitle">New scan</h1><p id="activeTarget" hidden></p>
 <form id="scanForm"><fieldset id="settings">
-<div class="targetEntry"><label for="target">Target</label>
+<div class="scanStage"><div class="targetEntry"><label for="target">Target</label>
 <div class="targetLens"><input id="target" required placeholder="127.0.0.1" aria-describedby="scope"></div>
 <small id="scope">Use localhost or a range within 127.0.0.0/8.</small></div>
 <button class="primary scanOrb" type="submit">
-RUN</button>
+RUN</button></div>
 <details><summary>Scan options</summary><div class="options"><div class="optionFields">
 <label>Ports<input id="ports" placeholder="Top 1000 ports"></label><label>Check timeout<input id="timeout" value="30s" pattern=".*\S.*" title="Enter a positive duration such as 30s." required></label>
 <label>Concurrent checks<input id="workers" type="number" min="1" max="128" value="10" required></label></div>

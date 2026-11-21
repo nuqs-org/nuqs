@@ -406,3 +406,22 @@ main:has(> #scanPage:not([hidden],.reportOnly)) {
 #scanPage:has(.launch details[open]) .referenceGrid {display:none}
 #scanPage:has(.launch details[open]) .workgrid,
 #scanPage.running .workgrid {flex:1}
+
+/* The disclosure spans the launch card; settings keep their own inset surface. */
+#scanPage:not(.running) .workgrid {display:flex;flex-direction:column}
+#scanPage.reportOnly .workgrid {display:none}
+#scanPage:not(.running) .launch {display:flex;flex-direction:column;flex:1;padding-inline:0;padding-bottom:0}
+#scanPage:not(.running) :is(#scanForm,#settings) {display:flex;flex-direction:column;flex:1}
+.scanStage {min-width:0;padding-inline:var(--launch-inset)}
+#scanPage:not(.running) .scanStage {flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.scanStage .targetEntry {margin:0 auto}
+.launch details {
+  border-top:1px solid var(--rule);
+  background:linear-gradient(180deg,var(--glass-shine),transparent 12px),var(--liquid-fill)
+}
+.launch details summary {
+  width:100%;min-height:44px;justify-content:center;margin:0;
+  border:0;border-radius:0;background:transparent;box-shadow:none
+}
+.launch details summary:focus-visible {outline-offset:-4px}
+.launch details[open] .options {margin:0 var(--launch-inset) var(--launch-inset)}
