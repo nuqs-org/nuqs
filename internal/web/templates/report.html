@@ -1,0 +1,29 @@
+<!-- Server-rendered scan report fragment (auto-escaped by html/template). -->
+<p id="status" role="status">{{.StatusLine}}</p>
+<p id="metadata">{{.MetadataLine}}</p>
+<div id="counts">{{range .Counts}}<span class="badge {{.Class}}">{{.Count}} {{.Level}}</span>{{end}}</div>
+<div class="toolbar">
+  <select id="filter" name="severity" aria-label="Filter findings by severity"
+    hx-get="/partials/report{{if not .Restored}}?fresh=1{{end}}"
+    hx-trigger="change"
+    hx-target="#reportContent"
+    hx-swap="innerHTML">
+    <option value=""{{if eq .SelectedSeverity ""}} selected{{end}}>Severity: All</option>
+    <option value="critical"{{if eq .SelectedSeverity "critical"}} selected{{end}}>Severity: Critical</option>
+    <option value="high"{{if eq .SelectedSeverity "high"}} selected{{end}}>Severity: High</option>
+    <option value="medium"{{if eq .SelectedSeverity "medium"}} selected{{end}}>Severity: Medium</option>
+    <option value="low"{{if eq .SelectedSeverity "low"}} selected{{end}}>Severity: Low</option>
+    <option value="info"{{if eq .SelectedSeverity "info"}} selected{{end}}>Severity: Info</option>
+  </select>
+  <button id="rawToggle" type="button" aria-expanded="false">Show raw JSON</button>
+</div>
+<pre id="raw" hidden>{{.RawJSON}}</pre>
+<div id="findings">{{if .HasReport}}{{if .Findings}}{{range .Findings}}<article>
+  <span class="badge {{badgeClass .Severity}}">{{.Severity}}</span>
+  <h3>{{.Title}}</h3>
+  <p class="endpoint">{{.Host}}:{{.Port}}/{{.Protocol}} · {{.CheckID}}</p>
+  <p>Evidence · {{.Evidence}}</p>
+  <p>Fix · {{.Fix}}</p>
+  <button type="button" class="copy" data-fix="{{.Fix}}">Copy fix</button>
+</article>{{end}}{{else}}{{.EmptyMessage}}{{end}}{{end}}</div>
+<div id="errors">{{if .Incomplete}}<h3>Scan errors</h3>{{if .Message}}<p>{{.Message}}</p>{{end}}{{range .Errors}}<p>{{.Host}}:{{.Port}} · {{.CheckID}} · {{.Error}}</p>{{end}}{{end}}</div>

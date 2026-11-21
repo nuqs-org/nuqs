@@ -1,15 +1,16 @@
-// Renders real engine events and reports for the Nuqs local prototype.
+// Enhances the server-rendered Nuqs workspace with SSE live progress, persistence and theme controls.
 "use strict";
 
 const byId = id => document.getElementById(id);
 const levels = ["critical", "high", "medium", "low", "info"];
 const reportKey = "nuqs:last-report:v1";
-let current;
-let controller;
-let started;
-let phase;
-let total;
-let completed;
+let current = null;
+let hasServerReport = byId("results")?.dataset.hasServerReport === "true";
+let controller = null;
+let started = 0;
+let phase = "";
+let total = 0;
+let completed = 0;
 
 function node(tag, text, className) {
   const el = document.createElement(tag);
@@ -71,10 +72,11 @@ document.addEventListener("keydown", event => {
     byId("railToggle").focus();
   }
 });
+
 function showProfile(value) {
-  const name = typeof value === "string" && value.trim() ? value.trim().slice(0,40) : "Local user";
+  const name = typeof value === "string" && value.trim() ? value.trim().slice(0, 40) : "Local user";
   byId("profileName").textContent = name;
-  byId("initials").textContent = name.split(/\s+/u).slice(0,2).map(word => Array.from(word)[0]).join("").toLocaleUpperCase();
+  byId("initials").textContent = name.split(/\s+/u).slice(0, 2).map(word => Array.from(word)[0]).join("").toLocaleUpperCase();
   byId("profileButton").title = "Edit profile · " + name;
   byId("profileButton").setAttribute("aria-label", byId("profileButton").title);
 }
@@ -99,18 +101,19 @@ byId("profileForm").onsubmit = event => {
   byId("profileDialog").close();
 };
 
-let catalog = [];
-let libraryRequest = 0;
+function hasAnyReport() {
+  return hasServerReport || Boolean(current);
+}
 
 function navigate(page, fresh = false) {
   if (narrowWindow.matches) setCompact(true);
   const reportOnly = page === "report";
-  const hasReport = Boolean(current);
+  const hasReport = hasAnyReport();
   byId("scanPage").hidden = page === "checks" || (reportOnly && !hasReport);
   byId("scanPage").classList.toggle("reportOnly", reportOnly);
   byId("checksPage").hidden = page !== "checks";
   byId("reportEmpty").hidden = !reportOnly || hasReport;
-  for (const [key, label] of [["scan","Scan console"], ["checks","Check library"], ["report","Latest report"]]) {
+  for (const [key, label] of [["scan", "Scan console"], ["checks", "Check library"], ["report", "Latest report"]]) {
     const button = byId(key + "Tab");
     if (key === page) {
       button.setAttribute("aria-current", "page");
@@ -118,12 +121,12 @@ function navigate(page, fresh = false) {
     } else button.removeAttribute("aria-current");
   }
   if (reportOnly && hasReport) {
-    if (!fresh) render(current, true);
-    byId("reportHeading").focus({preventScroll:true});
+    if (!fresh && !hasServerReport && current) renderLocalReport(current, true);
+    byId("reportHeading").focus({preventScroll: true});
   } else if (reportOnly) {
     const heading = byId("reportEmpty").querySelector("h1");
     heading.tabIndex = -1;
-    heading.focus({preventScroll:true});
+    heading.focus({preventScroll: true});
   }
   byId("results").hidden = !reportOnly || !hasReport;
   window.scrollTo(0, 0);
@@ -131,54 +134,23 @@ function navigate(page, fresh = false) {
 byId("scanTab").onclick = byId("backScan").onclick = () => navigate("scan");
 byId("checksTab").onclick = byId("openLibrary").onclick = () => {
   navigate("checks");
-  loadCatalog();
+  if (window.htmx) window.htmx.trigger(byId("checkSearch"), "search");
 };
 byId("reportTab").onclick = () => navigate("report");
 
-function renderLibrary() {
-  const term = byId("checkSearch").value.trim().toLowerCase();
-  const matches = catalog.filter(check =>
-    [check.title,check.id,check.severity,...(check.services || [])].join(" ").toLowerCase().includes(term));
-  byId("catalog").replaceChildren(...matches.map(check => {
-    const card = node("article", "");
-    card.append(badge(check.severity), node("h3", check.title),
-      node("p", [check.id, ...(check.services || [])].join(" · "), "endpoint"), node("p", check.fix));
-    return card;
-  }));
-  if (!matches.length) byId("catalog").textContent = "No matching checks.";
-}
-byId("checkSearch").oninput = renderLibrary;
-
-async function loadCatalog() {
-  const request = ++libraryRequest;
-  try {
-    const response = await fetch("/api/checks");
-    if (!response.ok) throw new Error();
-    const checks = await response.json();
-    if (request !== libraryRequest) return;
-    catalog = checks;
-    renderLibrary();
-    const header = node("div", "", "checkRow head");
-    header.append(node("span","Check"),node("span","Services"),node("span","Severity"));
-    byId("inventoryRows").replaceChildren(header,...checks.map(check => {
-      const row = node("div", "", "checkRow");
-      const name = node("div", check.title);
-      name.append(node("small", check.id));
-      row.append(name, node("span",(check.services || []).join(", ") || "—"), badge(check.severity));
-      return row;
-    }));
-  } catch {
-    if (request !== libraryRequest) return;
-    byId("catalog").textContent = byId("inventoryRows").textContent = "Can't reach the checks catalog.";
-  }
-}
-loadCatalog();
 async function engineStatus() {
   try {
     const response = await fetch("/api/status");
     if (!response.ok) throw new Error();
     const status = await response.json();
     byId("runner").textContent = status.runner;
+    if (status.addr) {
+      const addrEl = document.querySelector(".localAddress");
+      if (addrEl) addrEl.textContent = status.addr;
+    }
+    if (status.allowed_scope) {
+      byId("scope").textContent = "Allowed scope: " + status.allowed_scope + ".";
+    }
     byId("connection").textContent = "Engine online";
     byId("connection").classList.add("ready");
   } catch {
@@ -187,6 +159,7 @@ async function engineStatus() {
   }
 }
 engineStatus();
+
 function updateProfile() {
   byId("profilePorts").textContent = byId("ports").value.trim() || "Top 1000";
   byId("discovery").textContent = byId("skipPing").checked ? "Skipped" : "Enabled";
@@ -194,71 +167,141 @@ function updateProfile() {
   byId("profileWorkers").textContent = (byId("workers").value || "—") + " workers";
 }
 byId("scanForm").addEventListener("input", updateProfile);
+byId("scanForm").addEventListener("change", updateProfile);
+updateProfile();
 
 function badge(level) {
   return node("span", level, "badge " + (levels.includes(level) ? level : "info"));
 }
 
+function rank(level) {
+  const index = levels.indexOf(level);
+  return index === -1 ? levels.length : index;
+}
+
 function findingCard(finding) {
   const card = node("article", "");
   const copy = node("button", "Copy fix", "copy");
-  copy.onclick = async () => {
-    try { await navigator.clipboard.writeText(finding.fix); copy.textContent = "Copied"; }
-    catch { copy.textContent = "Copy unavailable"; }
-  };
-  card.append(badge(finding.severity), node("h3", finding.title),
+  copy.type = "button";
+  copy.dataset.fix = finding.fix || "";
+  card.append(
+    badge(finding.severity),
+    node("h3", finding.title),
     node("p", finding.host + ":" + finding.port + "/" + finding.protocol + " · " + finding.check_id, "endpoint"),
-    node("p", "Evidence · " + finding.evidence), node("p", "Fix · " + finding.fix), copy);
+    node("p", "Evidence · " + finding.evidence),
+    node("p", "Fix · " + finding.fix),
+    copy
+  );
   return card;
 }
 
-function renderFindings() {
-  const selected = byId("filter").value;
-  const findings = current.report.findings.filter(f => !selected || f.severity === selected);
-  findings.sort((a,b) => levels.indexOf(a.severity) - levels.indexOf(b.severity));
+function renderLocalFindings() {
+  if (!current || !current.report) return;
+  const filter = byId("filter");
+  const selected = filter ? filter.value : "";
+  const findings = (current.report.findings || []).filter(f => !selected || f.severity === selected);
+  findings.sort((a, b) => rank(a.severity) - rank(b.severity));
   byId("findings").replaceChildren(...findings.map(findingCard));
-  if (!findings.length) byId("findings").textContent = selected ? "No findings at this severity." : "No findings reported.";
+  if (!findings.length) {
+    const hostsUp = (current.report.hosts || []).length;
+    byId("findings").textContent = selected ? "No findings at this severity." :
+      hostsUp === 0 ? "No live hosts responded (try Skip host discovery if ping is blocked)." : "No findings reported.";
+  }
 }
-for (const level of levels) byId("filter").add(new Option("Severity: " + level[0].toUpperCase() + level.slice(1), level));
-byId("filter").onchange = renderFindings;
 
-function raw(show) {
-  byId("raw").hidden = !show;
-  byId("rawToggle").setAttribute("aria-expanded", String(show));
-  byId("rawToggle").textContent = show ? "Hide raw JSON" : "Show raw JSON";
+function setRawVisible(show) {
+  const rawEl = byId("raw");
+  const toggleEl = byId("rawToggle");
+  if (!rawEl || !toggleEl) return;
+  rawEl.hidden = !show;
+  toggleEl.setAttribute("aria-expanded", String(show));
+  toggleEl.textContent = show ? "Hide raw JSON" : "Show raw JSON";
 }
-byId("rawToggle").onclick = () => raw(byId("raw").hidden);
-byId("download").onclick = () => {
-  const url = URL.createObjectURL(new Blob([byId("raw").textContent], {type:"application/json"}));
-  const link = node("a", "");
-  link.href = url;
-  link.download = "nuqs-report.json";
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-};
 
-function render(saved, restored) {
+function renderLocalReport(saved, restored) {
   const {report, message} = saved;
   current = saved;
-  const duration = (Date.parse(report.finished) - Date.parse(report.started)) / 1000;
-  const incomplete = message || report.errors.length;
+  const findings = report.findings || [];
+  const reportErrors = report.errors || [];
+  const targets = report.targets || [];
+  const hosts = report.hosts || [];
+  const openServices = hosts.reduce((sum, h) => sum + (h.services ? h.services.length : 0), 0);
+  const duration = Math.max(0, (Date.parse(report.finished) - Date.parse(report.started)) / 1000);
+  const incomplete = message || reportErrors.length;
   const outcome = incomplete ? "Scan incomplete" : "Scan finished";
   byId("status").textContent = (restored ? "Last report · " : "") + outcome + " in " + duration.toFixed(2) + "s";
-  byId("metadata").textContent = report.targets.join(", ") + " · " + new Date(report.finished).toLocaleString();
+  const hostSummary = hosts.length + (hosts.length === 1 ? " host up" : " hosts up") + " · " +
+    openServices + (openServices === 1 ? " open service" : " open services");
+  byId("metadata").textContent = targets.join(", ") + " · " + hostSummary + " · " + new Date(report.finished).toLocaleString();
   byId("counts").replaceChildren(...levels.map(level => {
-    const count = report.findings.filter(f => f.severity === level).length;
+    const count = findings.filter(f => f.severity === level).length;
     return node("span", count + " " + level, "badge " + (count ? level : "info"));
   }));
   byId("raw").textContent = JSON.stringify(report, null, 2);
-  raw(false);
-  byId("filter").value = "";
-  renderFindings();
+  setRawVisible(false);
+  if (byId("filter")) byId("filter").value = "";
+  renderLocalFindings();
   const errors = byId("errors");
   errors.replaceChildren();
   if (incomplete) errors.append(node("h3", "Scan errors"));
   if (message) errors.append(node("p", message));
-  for (const err of report.errors) errors.append(node("p", err.host + ":" + err.port + " · " + err.check_id + " · " + err.error));
+  for (const err of reportErrors) errors.append(node("p", err.host + ":" + err.port + " · " + err.check_id + " · " + err.error));
   byId("results").hidden = false;
+}
+
+// Delegated interactions inside #results survive htmx swaps of #reportContent.
+byId("results").addEventListener("click", async event => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+  if (target.id === "rawToggle") {
+    setRawVisible(byId("raw").hidden);
+    return;
+  }
+  if (target.id === "download") {
+    const rawEl = byId("raw");
+    const url = URL.createObjectURL(new Blob([rawEl ? rawEl.textContent : "{}"], {type: "application/json"}));
+    const link = node("a", "");
+    link.href = url;
+    link.download = "nuqs-report.json";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return;
+  }
+  if (target.classList.contains("copy")) {
+    const fixText = target.dataset.fix || "";
+    clearTimeout(Number(target.dataset.resetTimer || 0));
+    try { await navigator.clipboard.writeText(fixText); target.textContent = "Copied"; }
+    catch { target.textContent = "Copy unavailable"; }
+    target.dataset.resetTimer = String(setTimeout(() => { target.textContent = "Copy fix"; }, 2000));
+  }
+});
+
+// When showing a localStorage-restored report after a server restart, filter locally instead of hitting the server.
+document.body.addEventListener("htmx:beforeRequest", event => {
+  if (event.target && event.target.id === "filter" && !hasServerReport && current) {
+    event.preventDefault();
+    renderLocalFindings();
+  }
+});
+byId("results").addEventListener("change", event => {
+  if (event.target && event.target.id === "filter" && !hasServerReport && current) {
+    renderLocalFindings();
+  }
+});
+
+async function refreshServerReport(saved) {
+  current = saved;
+  hasServerReport = true;
+  if (window.htmx) {
+    try {
+      await window.htmx.ajax("GET", "/partials/report?fresh=1", {target: "#reportContent", swap: "innerHTML"});
+      byId("results").hidden = false;
+      return;
+    } catch {
+      // Fall back to local DOM rendering if partial fetch fails.
+    }
+  }
+  renderLocalReport(saved, false);
 }
 
 function updateClock() {
@@ -279,7 +322,7 @@ function markStage(index) {
 
 function handleEvent(event) {
   if (event.type === "error") throw new Error(event.message || "Scan failed.");
-  if (event.type === "report" && event.report) return {report:event.report, message:event.message || ""};
+  if (event.type === "report" && event.report) return {report: event.report, message: event.message || ""};
   if (event.kind === "discovery_started") { markStage(0); phase = "Discovering services"; }
   if (event.kind === "discovery_done") phase = "Discovered " + (event.count || 0) + " hosts";
   if (event.kind === "checks_started") { markStage(1); total = event.count || 0; phase = "Running " + total + " checks"; }
@@ -315,24 +358,30 @@ async function receive(response) {
 const scanButton = document.querySelector(".scanOrb");
 const reduceEffects = window.matchMedia("(prefers-reduced-motion: reduce), (prefers-reduced-transparency: reduce), (prefers-contrast: more)");
 // Highlight the nearest glass edge without changing the contrast of its contents.
-for (const surface of document.querySelectorAll(".rail,.workgrid,.top,.toolbar,.scanOrb")) {
-  function reflectContact(event) {
-    if (surface.disabled || reduceEffects.matches) return;
-    const bounds = surface.getBoundingClientRect();
-    surface.style.setProperty("--reflection-x", (event.clientX - bounds.left) / bounds.width * 100 + "%");
-    surface.style.setProperty("--reflection-y", (event.clientY - bounds.top) / bounds.height * 100 + "%");
+function bindReflections(root) {
+  for (const surface of root.querySelectorAll(".rail,.workgrid,.top,.toolbar,.scanOrb")) {
+    if (surface.dataset.reflectionBound) continue;
+    surface.dataset.reflectionBound = "1";
+    function reflectContact(event) {
+      if (surface.disabled || reduceEffects.matches) return;
+      const bounds = surface.getBoundingClientRect();
+      surface.style.setProperty("--reflection-x", (event.clientX - bounds.left) / bounds.width * 100 + "%");
+      surface.style.setProperty("--reflection-y", (event.clientY - bounds.top) / bounds.height * 100 + "%");
+    }
+    function resetReflection() {
+      surface.style.removeProperty("--reflection-x");
+      surface.style.removeProperty("--reflection-y");
+    }
+    surface.addEventListener("pointermove", reflectContact);
+    surface.addEventListener("pointerdown", reflectContact);
+    surface.addEventListener("pointerleave", resetReflection);
+    surface.addEventListener("pointerup", resetReflection);
+    surface.addEventListener("pointercancel", resetReflection);
+    reduceEffects.addEventListener("change", resetReflection);
   }
-  function resetReflection() {
-    surface.style.removeProperty("--reflection-x");
-    surface.style.removeProperty("--reflection-y");
-  }
-  surface.addEventListener("pointermove", reflectContact);
-  surface.addEventListener("pointerdown", reflectContact);
-  surface.addEventListener("pointerleave", resetReflection);
-  surface.addEventListener("pointerup", resetReflection);
-  surface.addEventListener("pointercancel", resetReflection);
-  reduceEffects.addEventListener("change", resetReflection);
 }
+bindReflections(document);
+document.body.addEventListener("htmx:afterSwap", event => bindReflections(event.target));
 
 byId("stop").onclick = () => controller?.abort();
 // Keep the native disclosure and keyboard behavior when layout animation is unavailable.
@@ -362,9 +411,14 @@ byId("scanForm").addEventListener("invalid", event => {
 byId("scanForm").onsubmit = async event => {
   event.preventDefault();
   if (controller) return;
-  const request = {target:byId("target").value.trim(),ports:byId("ports").value.trim(),
-    timeout:byId("timeout").value.trim(), workers:byId("workers").valueAsNumber,
-    skip_ping:byId("skipPing").checked, force:byId("force").checked};
+  const request = {
+    target: byId("target").value.trim(),
+    ports: byId("ports").value.trim(),
+    timeout: byId("timeout").value.trim(),
+    workers: byId("workers").valueAsNumber,
+    skip_ping: byId("skipPing").checked,
+    force: byId("force").checked
+  };
   controller = new AbortController();
   byId("reportTab").disabled = true;
   started = performance.now();
@@ -386,22 +440,28 @@ byId("scanForm").onsubmit = async event => {
   if (!reduceEffects.matches) {
     const after = scanButton.getBoundingClientRect();
     scanButton.animate([
-      { transform: "translate(" + (before.x - after.x) + "px," + (before.y - after.y) + "px)" },
-      { transform: "none" }
+      {transform: "translate(" + (before.x - after.x) + "px," + (before.y - after.y) + "px)"},
+      {transform: "none"}
     ], {duration: 260, easing: "cubic-bezier(.22,.78,.24,1)"});
   }
   byId("elapsed").hidden = false;
   updateClock();
-  byId("stop").focus({preventScroll:true});
+  byId("stop").focus({preventScroll: true});
   const timer = setInterval(updateClock, 250);
   try {
-    const response = await fetch("/api/scan", {method:"POST", headers:{"Content-Type":"application/json"},
-      body:JSON.stringify(request), signal:controller.signal});
+    const response = await fetch("/api/scan", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(request),
+      signal: controller.signal
+    });
     if (!response.ok) throw new Error((await response.text()).trim() || "Scan request failed.");
     const saved = await receive(response);
-    render(saved, false);
+    await refreshServerReport(saved);
     if (!byId("scanPage").hidden) navigate("report", true);
-    if (!save(reportKey, saved)) byId("status").textContent += " · Report could not be saved on this device.";
+    if (!save(reportKey, saved) && byId("status")) {
+      byId("status").textContent += " · Report could not be saved on this device.";
+    }
   } catch (err) {
     byId("scanPhase").textContent = controller.signal.aborted ? "Scan stopped." :
       err instanceof TypeError ? "Can't reach the scan server." : err.message;
@@ -423,7 +483,11 @@ byId("scanForm").onsubmit = async event => {
     if (returnFocus) scanButton.focus();
   }
 };
+
 const previous = read(reportKey);
-if (previous) {
-  try { current = previous; navigate("report"); } catch { current = null; navigate("scan"); byId("status").textContent = ""; }
+if (hasServerReport) {
+  navigate("report", true);
+} else if (previous) {
+  try { current = previous; navigate("report"); }
+  catch { current = null; navigate("scan"); if (byId("status")) byId("status").textContent = ""; }
 }

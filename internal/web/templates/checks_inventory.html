@@ -1,0 +1,7 @@
+<!-- Compact table of registered checks for the scan console. -->
+<div class="checkRow head"><span>Check</span><span>Services</span><span>Severity</span></div>
+{{if .}}{{range .}}<div class="checkRow">
+  <div>{{.Title}}<small>{{.ID}}</small></div>
+  <span>{{if .Services}}{{join .Services ", "}}{{else}}—{{end}}</span>
+  <span class="badge {{badgeClass .Severity}}">{{.Severity}}</span>
+</div>{{end}}{{else}}<div class="checkRow"><span>No checks registered.</span><span>—</span><span class="badge info">info</span></div>{{end}}
