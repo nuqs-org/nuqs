@@ -269,18 +269,26 @@ function announcePhase() {
   if (byId("scanPhase").textContent !== phase) byId("scanPhase").textContent = phase;
 }
 
+function markStage(index) {
+  Array.from(byId("scanSteps").children).forEach((step, position) => {
+    step.classList.toggle("done", position < index);
+    if (position === index) step.setAttribute("aria-current", "step");
+    else step.removeAttribute("aria-current");
+  });
+}
+
 function handleEvent(event) {
   if (event.type === "error") throw new Error(event.message || "Scan failed.");
   if (event.type === "report" && event.report) return {report:event.report, message:event.message || ""};
-  if (event.kind === "discovery_started") phase = "Discovering services";
+  if (event.kind === "discovery_started") { markStage(0); phase = "Discovering services"; }
   if (event.kind === "discovery_done") phase = "Discovered " + (event.count || 0) + " hosts";
-  if (event.kind === "checks_started") { total = event.count || 0; phase = "Running " + total + " checks"; }
+  if (event.kind === "checks_started") { markStage(1); total = event.count || 0; phase = "Running " + total + " checks"; }
   if (event.kind === "checks_started" || event.kind === "check_done") {
     if (event.kind === "check_done") completed++;
     byId("checkCount").hidden = false;
     byId("checkCount").textContent = completed + " of " + total + " checks completed";
   }
-  if (event.kind === "scan_done") phase = "Preparing report";
+  if (event.kind === "scan_done") { markStage(2); phase = "Preparing report"; }
   announcePhase();
 }
 
@@ -363,6 +371,7 @@ byId("scanForm").onsubmit = async event => {
   phase = "Starting";
   completed = 0;
   total = 0;
+  const before = scanButton.getBoundingClientRect();
   byId("settings").disabled = true;
   byId("checkCount").hidden = true;
   byId("stop").hidden = false;
@@ -372,6 +381,15 @@ byId("scanForm").onsubmit = async event => {
   byId("activeTarget").textContent = request.target;
   byId("activeTarget").hidden = false;
   byId("scanPage").classList.add("running");
+  markStage(-1);
+  byId("scanSteps").hidden = false;
+  if (!reduceEffects.matches) {
+    const after = scanButton.getBoundingClientRect();
+    scanButton.animate([
+      { transform: "translate(" + (before.x - after.x) + "px," + (before.y - after.y) + "px)" },
+      { transform: "none" }
+    ], {duration: 260, easing: "cubic-bezier(.22,.78,.24,1)"});
+  }
   byId("elapsed").hidden = false;
   updateClock();
   byId("stop").focus({preventScroll:true});
@@ -390,6 +408,7 @@ byId("scanForm").onsubmit = async event => {
   } finally {
     if (!controller.signal.aborted) void engineStatus();
     clearInterval(timer);
+    byId("scanSteps").hidden = true;
     byId("scanPage").classList.remove("running");
     byId("launchTitle").textContent = "New scan";
     byId("activeTarget").hidden = true;

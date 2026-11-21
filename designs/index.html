@@ -19,7 +19,7 @@
 <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M20 14a8.4 8.4 0 0 1-10-10 8.5 8.5 0 1 0 10 10Z"/></svg>
 <span>Dark mode</span></button></div></header>
 <main><section id="scanPage"><div class="workgrid"><section class="launch" aria-labelledby="launchTitle">
-<h1 id="launchTitle">New scan</h1><p id="activeTarget" hidden></p>
+<header class="launchHeader"><h1 id="launchTitle">New scan</h1><p id="activeTarget" hidden></p></header>
 <form id="scanForm"><fieldset id="settings">
 <div class="scanStage"><div class="targetEntry"><label for="target">Target</label>
 <div class="fieldLens"><input id="target" required placeholder="127.0.0.1" aria-describedby="scope"></div>
@@ -31,7 +31,9 @@ RUN</button></div>
 <label>Concurrent checks<span class="fieldLens"><input id="workers" type="number" min="1" max="128" value="10" required></span></label></div>
 <div class="optionFlags"><label class="option"><input type="checkbox" id="skipPing">Skip host discovery <code>-Pn</code></label>
 <label class="option"><input type="checkbox" id="force">Allow over 1024 addresses <code>--force</code></label></div></div></details></fieldset></form>
-<div class="scanFeedback"><p id="scanPhase" role="status"></p><span id="checkCount" hidden></span><span id="elapsed" aria-hidden="true" hidden></span>
+<div class="scanFeedback">
+<ol id="scanSteps" aria-label="Scan stages" hidden><li>Discovery</li><li>Checks</li><li>Report</li></ol>
+<p id="scanPhase" role="status"></p><span id="checkCount" hidden></span><span id="elapsed" aria-hidden="true" hidden></span>
 <button id="stop" type="button" hidden>Stop scan</button></div></section>
 </div>
 
