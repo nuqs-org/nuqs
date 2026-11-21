@@ -15,18 +15,17 @@ library and latest report. The scan profile reflects current form values and the
 registered-check inventory comes from the engine. On narrow screens navigation
 moves above the workspace and the profile sits below scan configuration.
 
-The launch surface uses local optical-glass artwork and a mint circular control.
-The profile and registered checks share a row below it on wide screens. Use
-solid backgrounds for navigation, reports and supporting data. Increased
-contrast and reduced transparency preferences replace the artwork and control
-reflections with solid colors.
+A plain canvas supports glass panels with a lightly tinted rim. The full-height
+desktop rail holds the account entry points at its foot. Appearance follows the
+system setting. Display headings use a serif family and body text uses the
+system sans serif. Increased contrast and reduced transparency use solid panels.
 
 New scan anchors the console. Align the target field, circular submit control
 and options disclosure on a shared centerline. Show the busy label and ring
 only during a request. Reduced-motion mode keeps the indicator stationary.
 
 While a scan runs, the launch panel shows its target, engine phase, elapsed time
-and Stop action. The circular control displays completed and total checks when
-available. Only phase changes enter the live region. Completion opens and focuses
+and Stop action. The circular control reads RUN. Its adjacent feedback shows completed and total
+checks when available. Only phase changes enter the live region. Completion opens and focuses
 the report if the scan page is visible. Someone browsing the check library stays
 there. On phones, engine status sits beside the brand above one navigation row.

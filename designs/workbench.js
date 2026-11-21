@@ -26,16 +26,20 @@ function save(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch { return false; }
 }
 
-function theme(light) {
-  document.documentElement.classList.toggle("light", light);
-  byId("theme").textContent = light ? "Dark theme" : "Light theme";
+const appearance = matchMedia("(prefers-color-scheme: light)");
+function applyAppearance() {
+  document.documentElement.classList.toggle("light", appearance.matches);
 }
-theme(read("nuqs:light") === true);
-byId("theme").onclick = () => {
-  const light = !document.documentElement.classList.contains("light");
-  theme(light);
-  save("nuqs:light", light);
-};
+applyAppearance();
+appearance.addEventListener("change", applyAppearance);
+
+function openAccount(title, message) {
+  byId("accountTitle").textContent = title;
+  byId("accountNote").textContent = message;
+  byId("accountDialog").showModal();
+}
+byId("login").onclick = () => openAccount("Log in", "This prototype runs on your device. Account login is not connected yet.");
+byId("signup").onclick = () => openAccount("Sign up", "Account registration is not available in the local prototype. You can use the workspace without an account.");
 
 let catalog = [];
 let libraryRequest = 0;
@@ -214,8 +218,8 @@ function handleEvent(event) {
   if (event.kind === "checks_started") { total = event.count || 0; phase = "Running " + total + " checks"; }
   if (event.kind === "checks_started" || event.kind === "check_done") {
     if (event.kind === "check_done") completed++;
-    byId("runLabel").textContent = completed + " / " + total;
-    byId("runLabel").parentElement.setAttribute("aria-label", completed + " of " + total + " checks completed");
+    byId("checkCount").hidden = false;
+    byId("checkCount").textContent = completed + " of " + total + " checks completed";
   }
   if (event.kind === "scan_done") phase = "Preparing report";
   announcePhase();
@@ -241,7 +245,7 @@ async function receive(response) {
   } finally { reader.releaseLock(); }
 }
 
-const scanButton = byId("runLabel").parentElement;
+const scanButton = document.querySelector(".scanOrb");
 const reduceEffects = window.matchMedia("(prefers-reduced-motion: reduce), (prefers-reduced-transparency: reduce), (prefers-contrast: more)");
 function reflectContact(event) {
   if (scanButton.disabled || reduceEffects.matches) return;
@@ -277,7 +281,7 @@ byId("scanForm").onsubmit = async event => {
   completed = 0;
   total = 0;
   byId("settings").disabled = true;
-  byId("runLabel").textContent = "Scanning…";
+  byId("checkCount").hidden = true;
   byId("stop").hidden = false;
   byId("results").hidden = true;
   announcePhase();
@@ -312,11 +316,9 @@ byId("scanForm").onsubmit = async event => {
     controller = null;
     byId("reportTab").disabled = false;
     byId("settings").disabled = false;
-    byId("runLabel").textContent = "Run scan";
+    byId("checkCount").hidden = true;
     byId("stop").hidden = true;
-    const run = byId("runLabel").parentElement;
-    run.removeAttribute("aria-label");
-    if (returnFocus) run.focus();
+    if (returnFocus) scanButton.focus();
   }
 };
 const previous = read(reportKey);

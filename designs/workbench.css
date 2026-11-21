@@ -4,7 +4,7 @@
   --bg:#101515; --rail:#141919; --panel:#181e1e; --field:#111717;
   --text:#eef3f0; --sub:#b0bcb7; --line:#34403d; --rule:#2b3431; --accent:#a9e3ce;
   --selected:#243630; --low:#a5cef0; --medium:#ebc18a; --high:#ffaea5;
-  --sidebar:210px; --gutter:clamp(18px,3.4vw,54px);
+  --sidebar:224px; --gutter:clamp(18px,3.4vw,54px);
   --mono:ui-monospace,"SFMono-Regular",Consolas,monospace;
 }
 :root.light {
@@ -38,13 +38,13 @@ nav {display:grid;gap:5px}
 nav button {border:1px solid transparent;background:none;display:flex;align-items:center;gap:10px;text-align:left;color:var(--sub);font-size:14px;min-height:42px}
 nav [aria-current] {background:var(--selected);color:var(--accent)}
 .railFoot {margin-top:auto;padding:16px 4px 0;border-top:1px solid var(--rule)}
-#theme {font-size:13px}
+
 .top {margin-left:var(--sidebar);padding:16px var(--gutter);display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--rule);color:var(--sub);font-size:13px}
 .top b {padding:0 9px;color:var(--line)}.top strong {font-weight:500;color:var(--text)}
 main {margin-left:var(--sidebar);padding:24px var(--gutter) 52px}
 main>section {max-width:1360px;margin-inline:auto}
-.workgrid {border-radius:19px;overflow:hidden;background:#052022 url(optic.jpg) center 63% / cover no-repeat;color:#f1faf7;border:1px solid #4b6360}
-.launch {padding:clamp(22px,3vw,40px) 16px 18px;text-align:center;background:linear-gradient(180deg,#06161338,#00151530 65%,#06131660)}
+.workgrid {border-radius:19px;overflow:hidden;background:#182624;color:#f1faf7;border:1px solid #4b6360}
+.launch {padding:clamp(22px,3vw,40px) 16px 18px;text-align:center;background:transparent}
 .launch h1 {font-size:clamp(38px,4vw,58px);letter-spacing:-.06em;font-weight:620;margin-bottom:17px}
 fieldset {min-width:0;margin:0;border:0;padding:0}
 .targetEntry {width:min(365px,100%);margin:auto;text-align:left}
@@ -78,7 +78,7 @@ input:not([type=checkbox]) {display:block;width:100%;min-width:0;border-radius:8
 .profile dl div {display:flex;gap:8px;justify-content:space-between;align-items:baseline;padding:6px 0;border-top:1px solid var(--rule);font-size:12px}
 .profile dt {color:var(--sub)}.profile dd {margin:0;text-align:right;font-family:var(--mono);overflow-wrap:anywhere}
 #openLibrary {color:var(--accent);background:none;border:0;padding:4px;font-size:13px}
-.checkRow {display:grid;grid-template-columns:minmax(0,1.65fr) minmax(0,.8fr) 64px;align-items:center;gap:10px;padding:10px 18px;border-top:1px solid var(--rule);font-size:13px;overflow-wrap:anywhere}
+.checkRow {display:grid;grid-template-columns:minmax(0,1.65fr) minmax(0,.8fr) 80px;align-items:center;gap:10px;padding:10px 18px;border-top:1px solid var(--rule);font-size:13px;overflow-wrap:anywhere}
 .checkRow small {display:block;font:11px/1.5 var(--mono)}
 .checkRow.head {padding-block:5px;background:var(--field);color:var(--sub);font-size:11px}
 .badge {justify-self:start;font:600 12px/1.5 var(--mono);border-radius:5px;padding:1px 6px;border:1px solid currentColor}
@@ -91,7 +91,7 @@ article {margin:12px 0;padding:20px;overflow-wrap:anywhere}article h3 {margin-to
 pre {white-space:pre-wrap;overflow-wrap:anywhere;background:var(--panel);padding:14px}
 #errors {overflow-wrap:anywhere}#errors h3 {margin:16px 0 8px}
 @media(min-width:1500px){.scanOrb {width:138px;height:138px}}
-@media(max-width:1050px){:root {--sidebar:165px;--gutter:18px}.referenceGrid {grid-template-columns:1fr 1.8fr}.checkRow {grid-template-columns:minmax(0,1fr) 64px}.checkRow>:nth-child(2){display:none}}
+@media(max-width:1050px){:root {--sidebar:165px;--gutter:18px}.referenceGrid {grid-template-columns:1fr 1.8fr}.checkRow {grid-template-columns:minmax(0,1fr) 80px}.checkRow>:nth-child(2){display:none}}
 @media(max-width:740px){
   .rail {position:static;width:auto;display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:11px 14px 7px;border:0;border-bottom:1px solid var(--rule)}
   .brand {padding:0;font-size:26px}.brand i {width:20px;height:22px}
@@ -108,4 +108,70 @@ pre {white-space:pre-wrap;overflow-wrap:anywhere;background:var(--panel);padding
 }
 @media(prefers-reduced-transparency:reduce),(prefers-contrast:more){
   .workgrid {background:#0a2624}.launch {background:none}.scanOrb {background:#c5f2e4;box-shadow:none}
+}
+
+/* Use the panel rim and specular edge for depth on a plain canvas. */
+:root {
+  --glass-base:#1d2928;
+  --glass-tint:rgba(33,47,46,.88);
+  --glass-shine:rgba(232,255,247,.13);
+  --glass-edge:#4b5f59;
+  --sub:#c4cfcb;
+  --display:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+}
+:root.light {
+  --glass-base:#f4f8f6;
+  --glass-tint:rgba(246,250,248,.91);
+  --glass-shine:rgba(255,255,255,.96);
+  --glass-edge:#acbfb6;
+  --sub:#41574d;
+}
+:is(.rail,.workgrid,.profile,#inventory,article,dialog) {
+  background:linear-gradient(145deg,var(--glass-shine),transparent 27%),var(--glass-base);
+  border:1px solid var(--glass-edge);
+  box-shadow:inset 0 1px var(--glass-shine),0 5px 16px #00000010;
+}
+@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
+  :is(.rail,.workgrid,.profile,#inventory,article,dialog) {
+    background-color:var(--glass-tint);
+    -webkit-backdrop-filter:blur(16px) saturate(1.12);
+    backdrop-filter:blur(16px) saturate(1.12);
+  }
+}
+@media(min-width:741px){
+  .rail {top:8px;bottom:8px;left:8px;width:calc(var(--sidebar) - 10px);border-radius:19px;overflow-y:auto}
+}
+.railFoot {display:flex;align-items:center;gap:6px}
+.railFoot button {flex:1;white-space:nowrap;border-radius:20px;font-size:14px;font-weight:600}
+#signup {background:var(--accent);color:var(--bg)}
+.workgrid {color:var(--text)}
+h1,h2,h3,.launch h1 {font-family:var(--display);font-weight:600;letter-spacing:-.035em}
+.launch h1 {font-size:clamp(42px,5vw,66px)}
+.scanOrb {font:700 21px/1 system-ui,sans-serif;letter-spacing:.05em}
+.targetEntry input {background:var(--field);color:var(--text);border-color:var(--glass-edge)}
+.targetEntry input::placeholder,#scope {color:var(--sub)}
+.checkRow {font-size:14px}.checkRow small,.connection,.localAddress {font-size:12px}
+.profile dl div,.checkRow.head {font-size:13px}.checkRow small {margin-top:3px}
+#scope {font-size:13px}
+.badge {
+  display:inline-flex;align-items:center;white-space:nowrap;font:600 13px/1.5 system-ui,sans-serif;
+  padding:2px 9px;border-radius:999px;background-color:var(--panel);
+  background-image:linear-gradient(170deg,var(--glass-shine),transparent 60%);
+  border-color:currentColor;box-shadow:inset 0 1px var(--glass-shine);
+}
+@supports(background:color-mix(in srgb,red,white)){
+  .badge {background-color:color-mix(in srgb,currentColor 11%,var(--panel));border-color:color-mix(in srgb,currentColor 55%,var(--panel))}
+}
+dialog {color:var(--text);border-radius:18px;padding:24px;width:min(380px,calc(100% - 32px))}
+dialog::backdrop {background:#06110cc2}dialog p {margin:10px 0 20px;color:var(--sub)}
+.scanFeedback:has(#scanPhase:not(:empty)) {background:var(--field);color:var(--text)}
+#checkCount {font-variant-numeric:tabular-nums}
+@media(max-width:740px){
+  .rail {border-radius:0}.railFoot button {font-size:12px;padding:6px 9px}
+  .connection {font-size:11px}
+}
+@media(prefers-reduced-transparency:reduce),(prefers-contrast:more){
+  :is(.rail,.workgrid,.profile,#inventory,article,dialog,.badge) {
+    background:var(--panel);-webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:none
+  }
 }
