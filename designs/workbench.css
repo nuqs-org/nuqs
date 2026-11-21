@@ -161,3 +161,33 @@ button,select {border-radius:18px}
 .running .targetEntry {display:none}
 #activeTarget {font-family:ui-monospace,monospace;color:var(--muted);overflow-wrap:anywhere}
 .running .scanOrb {margin-block:16px}
+
+/* An interactive highlight follows contact across the scan control. */
+.scanOrb {
+  --reflection-x:36%;
+  --reflection-y:20%;
+  --lens-light:#e5f4ff;
+  --lens-mid:#a9cdef;
+  --lens-edge:#6799cf;
+  background:
+    radial-gradient(ellipse at var(--reflection-x) var(--reflection-y), #fffffff0 0%, #ffffff55 16%, transparent 42%),
+    radial-gradient(circle at 68% 80%, #ffffff7a, transparent 34%),
+    linear-gradient(150deg,var(--lens-light),var(--lens-mid) 59%,var(--lens-edge));
+  box-shadow:inset 0 2px 2px #ffffffd9,inset 0 -3px 5px #294c7947,
+    inset 0 0 0 4px #ffffff26,0 6px 20px #09152338;
+}
+.light .scanOrb {
+  --lens-light:#558ac2;
+  --lens-mid:#25588f;
+  --lens-edge:#163a65;
+  background:
+    radial-gradient(ellipse at var(--reflection-x) var(--reflection-y), #ffffff52, transparent 34%),
+    linear-gradient(150deg,var(--lens-light),var(--lens-mid) 56%,var(--lens-edge));
+}
+@media(prefers-reduced-motion:no-preference) {
+  .scanOrb {transition:transform 140ms ease-out}
+  .scanOrb:enabled:active {transform:scale(.95)}
+}
+@media(prefers-reduced-transparency:reduce),(prefers-contrast:more) {
+  .scanOrb,.light .scanOrb {background:var(--action);color:var(--ink);box-shadow:none}
+}
