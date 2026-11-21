@@ -19,3 +19,7 @@ The web treatment of Liquid Glass uses floating navigation, translucent surfaces
 and a local CSS wallpaper. Text-heavy report surfaces remain opaque. Browsers
 without backdrop filtering receive a solid navigation surface. Increased contrast
 and reduced transparency preferences also remove the wallpaper ribbons and blur.
+
+New scan anchors the console. Align the target field, circular submit control
+and options disclosure on a shared centerline. Show the busy label and ring
+only during a request. Reduced-motion mode keeps the indicator stationary.

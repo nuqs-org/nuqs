@@ -239,6 +239,7 @@ byId("scanForm").onsubmit = async event => {
   completed = 0;
   total = 0;
   byId("settings").disabled = true;
+  byId("runLabel").textContent = "Scanning…";
   byId("stop").hidden = false;
   byId("results").hidden = true;
   progress();
@@ -258,6 +259,7 @@ byId("scanForm").onsubmit = async event => {
     controller = null;
     byId("reportTab").disabled = false;
     byId("settings").disabled = false;
+    byId("runLabel").textContent = "Run scan";
     byId("stop").hidden = true;
   }
 };

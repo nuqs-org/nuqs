@@ -97,3 +97,45 @@ button,select {border-radius:18px}
   .rail nav [aria-current] {background:var(--panel);border-color:var(--accent)}
 }
 @media(prefers-reduced-motion:reduce){button:not(:disabled):active {transform:none}}
+
+/* One central axis for the target, scan action and expandable settings. */
+.workgrid {
+  display:block;
+  background:var(--panel);
+}
+.launch {padding:clamp(22px,3vw,40px) clamp(14px,4vw,48px) 0;text-align:center}
+.launch h1 {margin:0 0 18px;font-size:clamp(36px,4.5vw,60px);line-height:1.05;letter-spacing:-.055em}
+.launch form {padding:0}
+.targetEntry {width:min(100%,26rem);margin-inline:auto}
+.targetEntry label {display:block;text-align:left;margin:0 0 4px;font-size:14px;font-weight:600}
+.targetEntry input {height:46px;border-radius:14px;padding-inline:16px;font:16px ui-monospace,monospace}
+.targetEntry small {display:block;margin-top:5px}
+.scanOrb {
+  display:grid;place-content:center;justify-items:center;gap:5px;position:relative;
+  width:clamp(116px,12vw,148px);aspect-ratio:1;padding:0;margin:26px auto;
+  border-radius:50%;font-size:17px;font-weight:650;letter-spacing:-.025em;
+  background:linear-gradient(145deg,#f3faff 0%,#c1dcff 45%,#9ec7fa 85%,#d8eaff);
+  color:#13283f;border:1px solid #e3f2ff;
+  box-shadow:inset 0 2px 4px #fffc,inset 0 -4px 9px #648bb967,0 7px 20px #090f1b36;
+}
+.scanOrb::after {content:"";position:absolute;inset:-7px;border-radius:inherit;border:1px solid var(--line);pointer-events:none}
+.light .scanOrb {background:linear-gradient(145deg,#477bb8,#215995 54%,#164775);color:white;border-color:#4579b0}
+.scanOrb:not(:disabled):hover {filter:brightness(1.07)}
+.scanOrb:disabled {opacity:1;cursor:progress}
+.scanOrb:disabled::after {border-top:3px solid var(--accent);animation:scan-orbit 1.25s linear infinite}
+@keyframes scan-orbit {to{transform:rotate(1turn)}}
+.launch details {margin:0;border:0;padding:0 0 18px}
+.launch summary {width:max-content;max-width:100%;margin:auto;color:var(--muted)}
+.launch .options {text-align:left}
+.profile {margin:0;padding:16px clamp(14px,3vw,32px);border:0;border-top:1px solid var(--line)}
+.profile .panelTitle {justify-content:center;padding:0}.profile .panelTitle h2 {font-size:15px}
+.profile dl {display:grid;grid-template-columns:repeat(5,minmax(0,1fr));margin:12px 0 0;text-align:center;gap:0}
+.profile dl div {padding:2px 8px}.profile dl div + div {border-left:1px solid var(--line)}
+.profile dd {margin:4px 0 0;text-align:center}
+@media(max-width:720px){
+  .profile dl {grid-template-columns:1fr;gap:0}
+  .profile dl div {display:flex;justify-content:space-between;gap:16px;padding:5px 0}
+  .profile dl div + div {border:0;border-top:1px solid var(--line)}
+  .profile dd {margin:0;text-align:right}
+}
+@media(prefers-reduced-motion:reduce){.scanOrb:disabled::after {animation:none}}
