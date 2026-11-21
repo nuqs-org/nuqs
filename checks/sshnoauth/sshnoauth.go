@@ -31,7 +31,7 @@ func (Check) Info() check.Info {
 		ID:       "ssh-no-auth",
 		Title:    "SSH server lets anyone log in without a password",
 		Severity: model.Critical,
-		Fix:      "Turn off empty logins: set PermitEmptyPasswords no in sshd_config (or remove -B from dropbear), give every account a key or password, then restart SSH.",
+		Fix:      "Make the SSH server ask for a key or password for every login (in OpenSSH, set PermitEmptyPasswords no). On a device where you can't change that, update its firmware or turn SSH off.",
 		Ports:    []int{22},
 		Services: []string{"ssh"},
 	}

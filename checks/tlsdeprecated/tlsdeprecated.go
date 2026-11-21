@@ -6,8 +6,10 @@
 //
 // A server that turns an old version down sends a TLS alert, or Go hangs up
 // because the server picked a newer version. A connection that just drops
-// (closed or reset mid handshake) proves nothing, so we try once more and
-// give an error if it drops again, instead of calling the server clean.
+// (closed or reset mid handshake) proves nothing on its own, so we try once
+// more. If it drops again but a TLS 1.2 or 1.3 handshake still works, the
+// server refuses old versions by hanging up. If that fails too, we give an
+// error instead of calling the server clean.
 //
 // Both versions are deprecated (RFC 8996) and every current browser has
 // dropped them. SSL 3.0 isn't tested, Go can't speak it.
@@ -73,7 +75,15 @@ func (Check) Run(ctx context.Context, t check.Target) (*check.Result, error) {
 			ok, err = handshake(ctx, t, v.version, v.version) // one retry, drops can be a hiccup
 		}
 		if errors.Is(err, errDropped) {
-			return nil, fmt.Errorf("couldn't test %s: %w", v.name, err)
+			// Some servers (IIS for one) refuse an old version by hanging up
+			// instead of sending an alert. If a normal handshake still works
+			// right after, the hang up was a refusal. If not, the server is
+			// flaky and we can't tell.
+			if modern, merr := handshake(ctx, t, tls.VersionTLS12, tls.VersionTLS13); merr == nil && modern {
+				ok, err = false, nil
+			} else {
+				return nil, fmt.Errorf("couldn't test %s: %w", v.name, err)
+			}
 		}
 		if err != nil {
 			return nil, err

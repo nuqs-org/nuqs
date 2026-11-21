@@ -195,3 +195,44 @@ func TestDroppedOnModernServer(t *testing.T) {
 		t.Errorf("want an error and no finding, got %+v, %v", res, err)
 	}
 }
+
+// hangsUpOnOld sits in front of real and drops any connection whose
+// ClientHello asks for less than TLS 1.2, like IIS does, instead of sending an alert.
+func hangsUpOnOld(t *testing.T, real check.Target) check.Target {
+	t.Helper()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { l.Close() })
+	go func() {
+		for {
+			c, err := l.Accept()
+			if err != nil {
+				return
+			}
+			// 5 bytes record header, 4 bytes handshake header, then the client version.
+			hello := make([]byte, 11)
+			if _, err := io.ReadFull(c, hello); err != nil || int(hello[9])<<8|int(hello[10]) < tls.VersionTLS12 {
+				c.Close()
+				continue
+			}
+			up, err := net.Dial("tcp", real.Address())
+			if err != nil {
+				c.Close()
+				continue
+			}
+			_, _ = up.Write(hello)
+			go func() { _, _ = io.Copy(up, c); up.Close() }()
+			go func() { _, _ = io.Copy(c, up); c.Close() }()
+		}
+	}()
+	return target(t, l.Addr().String(), "https", "")
+}
+
+func TestHangUpIsRefusal(t *testing.T) {
+	res, err := run(t, hangsUpOnOld(t, server(t, tls.VersionTLS10, tls.VersionTLS13)))
+	if err != nil || res != nil {
+		t.Errorf("a server that hangs up on old versions but does TLS 1.2 is clean, got %+v, %v", res, err)
+	}
+}
