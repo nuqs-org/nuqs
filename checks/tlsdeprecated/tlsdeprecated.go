@@ -4,6 +4,11 @@
 // sure the service speaks TLS at all, then tries again allowing only TLS 1.0,
 // then only TLS 1.1. It hangs up after each handshake and sends no data.
 //
+// A server that turns an old version down sends a TLS alert, or Go hangs up
+// because the server picked a newer version. A connection that just drops
+// (closed or reset mid handshake) proves nothing, so we try once more and
+// give an error if it drops again, instead of calling the server clean.
+//
 // Both versions are deprecated (RFC 8996) and every current browser has
 // dropped them. SSL 3.0 isn't tested, Go can't speak it.
 package tlsdeprecated
@@ -11,7 +16,9 @@ package tlsdeprecated
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"slices"
 	"strings"
@@ -62,6 +69,12 @@ func (Check) Run(ctx context.Context, t check.Target) (*check.Result, error) {
 	var accepted []string
 	for _, v := range old {
 		ok, err := handshake(ctx, t, v.version, v.version)
+		if errors.Is(err, errDropped) {
+			ok, err = handshake(ctx, t, v.version, v.version) // one retry, drops can be a hiccup
+		}
+		if errors.Is(err, errDropped) {
+			return nil, fmt.Errorf("couldn't test %s: %w", v.name, err)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -75,8 +88,13 @@ func (Check) Run(ctx context.Context, t check.Target) (*check.Result, error) {
 	return &check.Result{Evidence: "server completed a handshake with " + strings.Join(accepted, " and ")}, nil
 }
 
+// errDropped means the connection was closed or reset during the handshake,
+// so we can't tell if the server would have accepted the version.
+var errDropped = errors.New("server dropped the connection during the handshake")
+
 // handshake connects and tries one TLS handshake with versions min to max.
-// It returns false when the server refused, and an error when we couldn't connect.
+// It returns false when the server refused, errDropped when the connection
+// dropped, and another error when we couldn't connect.
 func handshake(ctx context.Context, t check.Target, minV, maxV uint16) (bool, error) {
 	var d net.Dialer
 	conn, err := d.DialContext(ctx, "tcp", t.Address())
@@ -103,8 +121,24 @@ func handshake(ctx context.Context, t check.Target, minV, maxV uint16) (bool, er
 		if ctx.Err() != nil {
 			return false, ctx.Err()
 		}
+		if dropped(err) {
+			return false, errDropped
+		}
 		return false, nil
 	}
 	_ = tc.Close()
 	return true, nil
+}
+
+// dropped reports whether a handshake error came from the network instead of
+// from TLS. A refusal is an alert from the server or a version Go won't accept.
+// A drop is EOF or a network error like "connection reset". Go wraps alerts
+// from the server in a net.OpError too, with Op "remote error", so those are
+// left out.
+func dropped(err error) bool {
+	var ne *net.OpError
+	if errors.As(err, &ne) {
+		return ne.Op != "remote error"
+	}
+	return errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)
 }

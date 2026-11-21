@@ -54,8 +54,8 @@ func TestPassword(t *testing.T) {
 
 func TestNoAuth(t *testing.T) {
 	res, err := answer(&sshprobe.Auth{Banner: "SSH-2.0-dropbear", NoAuth: true}, nil, nil).Run(context.Background(), target)
-	if err != nil || res == nil {
-		t.Fatalf("want a finding, got %+v, %v", res, err)
+	if err != nil || res != nil {
+		t.Errorf("no credentials at all is ssh-no-auth's finding, not this one, got %+v, %v", res, err)
 	}
 }
 

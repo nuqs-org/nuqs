@@ -5,6 +5,9 @@
 // the list of login methods the server offers back. Servers send that same
 // list for users that don't exist, so the user name doesn't matter.
 //
+// A server that lets us in with no credentials at all is left to the
+// ssh-no-auth check, so it doesn't show up here as a password problem.
+//
 // Only the "password" method is flagged. "keyboard-interactive" is often a
 // password too, but it's also used for one-time codes, so it isn't a sure sign.
 package sshpasswordauth
@@ -51,10 +54,7 @@ func (c Check) Run(ctx context.Context, t check.Target) (*check.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	if a.NoAuth {
-		return &check.Result{Evidence: fmt.Sprintf("%s let us log in as %q with no password or key at all", a.Banner, user)}, nil
-	}
-	if !slices.Contains(a.Methods, "password") {
+	if a.NoAuth || !slices.Contains(a.Methods, "password") {
 		return nil, nil
 	}
 	return &check.Result{

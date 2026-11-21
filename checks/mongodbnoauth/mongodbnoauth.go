@@ -149,6 +149,7 @@ func judge(doc []byte) (*check.Result, error) {
 	var ok, code float64
 	var codeName, errmsg string
 	var names []string
+	hasList := false
 	for _, f := range fields {
 		switch f.name {
 		case "ok":
@@ -163,6 +164,7 @@ func judge(doc []byte) (*check.Result, error) {
 			if f.kind != bsonArray {
 				return nil, errors.New(`"databases" isn't a list`)
 			}
+			hasList = true
 			dbs, err := elements(f.raw)
 			if err != nil {
 				return nil, err
@@ -185,6 +187,10 @@ func judge(doc []byte) (*check.Result, error) {
 	}
 
 	switch {
+	case ok == 1 && !hasList:
+		// Real MongoDB always sends the list, even an empty one. Without it we
+		// can't say what we read, so don't claim a finding.
+		return nil, errors.New(`MongoDB said ok but sent no "databases" list, this may not be MongoDB`)
 	case ok == 1:
 		return &check.Result{Evidence: "ran listDatabases without logging in and got " + list(names)}, nil
 	case code == codeUnauthorized || codeName == "Unauthorized" || strings.Contains(errmsg, "requires authentication"):

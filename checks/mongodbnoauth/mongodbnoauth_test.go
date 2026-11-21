@@ -181,6 +181,14 @@ func TestLocked(t *testing.T) {
 	}
 }
 
+func TestEmptyList(t *testing.T) {
+	// A server with no databases yet is still open, anyone can create one.
+	res, err := run(t, (&fakeMongo{reply: doc(dbList(), double("ok", 1))}).start(t))
+	if err != nil || res == nil || res.Evidence != "ran listDatabases without logging in and got an empty list of databases" {
+		t.Errorf("got %+v, %v", res, err)
+	}
+}
+
 func TestManyDatabases(t *testing.T) {
 	var names []string
 	for i := range 12 {
@@ -199,6 +207,7 @@ func TestOtherErrors(t *testing.T) {
 		"http":          {raw: []byte("HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n")},
 		"bad bson":      {reply: []byte{9, 0, 0, 0, 0x10, 'o', 'k', 0, 0}},
 		"databases bad": {reply: doc(str("databases", "x"), double("ok", 1))},
+		"no databases":  {reply: doc(double("ok", 1))},
 		"closes":        {raw: []byte{}},
 	}
 	for name, f := range cases {

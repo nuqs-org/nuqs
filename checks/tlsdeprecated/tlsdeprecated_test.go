@@ -5,10 +5,13 @@ package tlsdeprecated
 import (
 	"context"
 	"crypto/tls"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -129,5 +132,66 @@ func TestSlowServer(t *testing.T) {
 	}
 	if time.Since(start) > time.Second {
 		t.Error("didn't stop when the context ended")
+	}
+}
+
+// flaky sits in front of real. It passes the first connection through (the
+// baseline handshake), drops the next drops connections right after the
+// ClientHello, then passes everything through again.
+func flaky(t *testing.T, real check.Target, drops int32) check.Target {
+	t.Helper()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { l.Close() })
+	var n atomic.Int32
+	go func() {
+		for {
+			c, err := l.Accept()
+			if err != nil {
+				return
+			}
+			if i := n.Add(1); i > 1 && i <= 1+drops {
+				_, _ = c.Read(make([]byte, 512))
+				c.Close()
+				continue
+			}
+			up, err := net.Dial("tcp", real.Address())
+			if err != nil {
+				c.Close()
+				continue
+			}
+			go func() { _, _ = io.Copy(up, c); up.Close() }()
+			go func() { _, _ = io.Copy(c, up); c.Close() }()
+		}
+	}()
+	return target(t, l.Addr().String(), "https", "")
+}
+
+func TestDroppedIsNotClean(t *testing.T) {
+	// The server would accept TLS 1.0, but every old version try gets dropped.
+	// That must be an error, never "no finding".
+	res, err := run(t, flaky(t, server(t, tls.VersionTLS10, tls.VersionTLS13), 100))
+	if err == nil || res != nil {
+		t.Fatalf("want an error and no finding, got %+v, %v", res, err)
+	}
+	if !strings.Contains(err.Error(), "couldn't test TLS 1.0") {
+		t.Errorf("error should say which version, got %v", err)
+	}
+}
+
+func TestDroppedOnceIsRetried(t *testing.T) {
+	res, err := run(t, flaky(t, server(t, tls.VersionTLS10, tls.VersionTLS13), 1))
+	if err != nil || res == nil || res.Evidence != "server completed a handshake with TLS 1.0 and TLS 1.1" {
+		t.Errorf("a single drop should be retried, got %+v, %v", res, err)
+	}
+}
+
+func TestDroppedOnModernServer(t *testing.T) {
+	// Even when the server would refuse, a drop means we don't know, so it's an error.
+	res, err := run(t, flaky(t, server(t, tls.VersionTLS12, tls.VersionTLS13), 100))
+	if err == nil || res != nil {
+		t.Errorf("want an error and no finding, got %+v, %v", res, err)
 	}
 }

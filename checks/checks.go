@@ -10,6 +10,7 @@ import (
 	"github.com/nuqs-org/nuqs/checks/httpheaders"
 	"github.com/nuqs-org/nuqs/checks/mongodbnoauth"
 	"github.com/nuqs-org/nuqs/checks/redisnoauth"
+	"github.com/nuqs-org/nuqs/checks/sshnoauth"
 	"github.com/nuqs-org/nuqs/checks/sshpasswordauth"
 	"github.com/nuqs-org/nuqs/checks/sshweakalgos"
 	"github.com/nuqs-org/nuqs/checks/telnet"
@@ -24,6 +25,7 @@ func All() []check.Check {
 		httpheaders.Check{},
 		mongodbnoauth.Check{},
 		redisnoauth.Check{},
+		sshnoauth.Check{},
 		sshpasswordauth.Check{},
 		sshweakalgos.Check{},
 		telnet.Check{},
