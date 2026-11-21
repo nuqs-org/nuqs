@@ -23,3 +23,9 @@ and reduced transparency preferences also remove the wallpaper ribbons and blur.
 New scan anchors the console. Align the target field, circular submit control
 and options disclosure on a shared centerline. Show the busy label and ring
 only during a request. Reduced-motion mode keeps the indicator stationary.
+
+While a scan runs, the launch panel shows its target, engine phase, elapsed time
+and Stop action. The circular control displays completed and total checks when
+available. Only phase changes enter the live region. Completion opens and focuses
+the report if the scan page is visible. Someone browsing the check library stays
+there. On phones, engine status sits beside the brand above one navigation row.

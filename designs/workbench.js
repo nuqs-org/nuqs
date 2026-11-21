@@ -40,9 +40,9 @@ byId("theme").onclick = () => {
 let catalog = [];
 let libraryRequest = 0;
 
-function navigate(page) {
+function navigate(page, fresh = false) {
   const reportOnly = page === "report";
-  const hasReport = current && !controller;
+  const hasReport = Boolean(current);
   byId("scanPage").hidden = page === "checks" || (reportOnly && !hasReport);
   byId("scanPage").classList.toggle("reportOnly", reportOnly);
   byId("checksPage").hidden = page !== "checks";
@@ -54,7 +54,15 @@ function navigate(page) {
       byId("crumb").textContent = label;
     } else button.removeAttribute("aria-current");
   }
-  if (reportOnly && hasReport) render(current, true);
+  if (reportOnly && hasReport) {
+    if (!fresh) render(current, true);
+    byId("reportHeading").focus({preventScroll:true});
+  } else if (reportOnly) {
+    const heading = byId("reportEmpty").querySelector("h1");
+    heading.tabIndex = -1;
+    heading.focus({preventScroll:true});
+  }
+  byId("results").hidden = !reportOnly || !hasReport;
   window.scrollTo(0, 0);
 }
 byId("scanTab").onclick = byId("backScan").onclick = () => navigate("scan");
@@ -108,9 +116,12 @@ async function engineStatus() {
     if (!response.ok) throw new Error();
     const status = await response.json();
     byId("runner").textContent = status.runner;
-    byId("connection").textContent = "Local engine connected";
+    byId("connection").textContent = "Engine online";
     byId("connection").classList.add("ready");
-  } catch { byId("connection").textContent = "Engine unavailable"; }
+  } catch {
+    byId("connection").classList.remove("ready");
+    byId("connection").textContent = "Engine offline";
+  }
 }
 engineStatus();
 function updateProfile() {
@@ -187,8 +198,12 @@ function render(saved, restored) {
   byId("results").hidden = false;
 }
 
-function progress() {
-  byId("status").textContent = "Scanning… " + phase + " · " + ((performance.now()-started)/1000).toFixed(1) + "s";
+function updateClock() {
+  byId("elapsed").textContent = ((performance.now() - started) / 1000).toFixed(1) + "s elapsed";
+}
+
+function announcePhase() {
+  if (byId("scanPhase").textContent !== phase) byId("scanPhase").textContent = phase;
 }
 
 function handleEvent(event) {
@@ -197,9 +212,13 @@ function handleEvent(event) {
   if (event.kind === "discovery_started") phase = "Discovering services";
   if (event.kind === "discovery_done") phase = "Discovered " + (event.count || 0) + " hosts";
   if (event.kind === "checks_started") { total = event.count || 0; phase = "Running " + total + " checks"; }
-  if (event.kind === "check_done") phase = "Completed " + (++completed) + " of " + total + " checks";
+  if (event.kind === "checks_started" || event.kind === "check_done") {
+    if (event.kind === "check_done") completed++;
+    byId("runLabel").textContent = completed + " / " + total;
+    byId("runLabel").parentElement.setAttribute("aria-label", completed + " of " + total + " checks completed");
+  }
   if (event.kind === "scan_done") phase = "Preparing report";
-  progress();
+  announcePhase();
 }
 
 async function receive(response) {
@@ -242,28 +261,46 @@ byId("scanForm").onsubmit = async event => {
   byId("runLabel").textContent = "Scanning…";
   byId("stop").hidden = false;
   byId("results").hidden = true;
-  progress();
-  const timer = setInterval(progress, 250);
+  announcePhase();
+  byId("launchTitle").textContent = "Scan in progress";
+  byId("activeTarget").textContent = request.target;
+  byId("activeTarget").hidden = false;
+  byId("scanPage").classList.add("running");
+  byId("elapsed").hidden = false;
+  updateClock();
+  byId("stop").focus({preventScroll:true});
+  const timer = setInterval(updateClock, 250);
   try {
     const response = await fetch("/api/scan", {method:"POST", headers:{"Content-Type":"application/json"},
       body:JSON.stringify(request), signal:controller.signal});
     if (!response.ok) throw new Error((await response.text()).trim() || "Scan request failed.");
     const saved = await receive(response);
     render(saved, false);
+    if (!byId("scanPage").hidden) navigate("report", true);
     if (!save(reportKey, saved)) byId("status").textContent += " · Report could not be saved on this device.";
   } catch (err) {
-    byId("status").textContent = controller.signal.aborted ? "Scan stopped." :
+    byId("scanPhase").textContent = controller.signal.aborted ? "Scan stopped." :
       err instanceof TypeError ? "Can't reach the scan server." : err.message;
   } finally {
+    if (!controller.signal.aborted) void engineStatus();
     clearInterval(timer);
+    byId("scanPage").classList.remove("running");
+    byId("launchTitle").textContent = "New scan";
+    byId("activeTarget").hidden = true;
+    byId("elapsed").hidden = true;
+    if (!byId("results").hidden) byId("scanPhase").textContent = "";
+    const returnFocus = document.activeElement === byId("stop");
     controller = null;
     byId("reportTab").disabled = false;
     byId("settings").disabled = false;
     byId("runLabel").textContent = "Run scan";
     byId("stop").hidden = true;
+    const run = byId("runLabel").parentElement;
+    run.removeAttribute("aria-label");
+    if (returnFocus) run.focus();
   }
 };
 const previous = read(reportKey);
 if (previous) {
-  try { render(previous, true); } catch { byId("results").hidden = true; byId("status").textContent = ""; }
+  try { current = previous; navigate("report"); } catch { current = null; navigate("scan"); byId("status").textContent = ""; }
 }
