@@ -57,8 +57,6 @@ input:not([type=checkbox]) {display:block;width:100%;min-width:0;border-radius:8
 .scanOrb::after {content:"";position:absolute;inset:-6px;border:1px solid #dddddd77;border-radius:50%;pointer-events:none}
 .scanOrb svg {width:27px;height:27px}
 .scanOrb:disabled::after {border-top:2px solid #f1f1f1}
-.launch details {margin-inline:calc(-1 * var(--launch-inset))}
-#scanPage:not(.running) .launch:has(details[open]) {padding-bottom:0}
 .launch summary {
   display:flex;align-items:center;gap:9px;width:fit-content;min-height:34px;
   margin:auto;padding:4px 14px;color:var(--text);font-size:13px;font-weight:600;
@@ -72,7 +70,7 @@ input:not([type=checkbox]) {display:block;width:100%;min-width:0;border-radius:8
 .launch details[open] summary::after {margin-top:3px;transform:rotate(225deg)}
 .options {
   text-align:left;margin-top:16px;padding:clamp(16px,2.5vw,32px);
-  background:#414141;border-top:1px solid var(--glass-edge)
+  background:#414141;border:1px solid var(--glass-edge);border-radius:12px
 }
 .light .options {background:#ededed}
 .optionFields {display:grid;grid-template-columns:minmax(0,1.4fr) repeat(2,minmax(0,1fr));gap:14px}
