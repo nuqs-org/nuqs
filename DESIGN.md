@@ -9,3 +9,8 @@ Use real engine progress and report timestamps so fast scans can finish immediat
 Show the target and finish time with every report, including after a refresh.
 Present severity counts first, followed by findings with their endpoint, evidence
 and fix. Show check errors even when there are no findings.
+
+The persistent workspace navigation connects the scan console, searchable check
+library and latest report. The scan profile reflects current form values and the
+registered-check inventory comes from the engine. On narrow screens navigation
+moves above the workspace and the profile sits below scan configuration.

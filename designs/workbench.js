@@ -37,29 +37,89 @@ byId("theme").onclick = () => {
   save("nuqs:light", light);
 };
 
-function tab(checks) {
-  byId("scanPage").hidden = checks;
-  byId("checksPage").hidden = !checks;
-  byId(checks ? "checksTab" : "scanTab").setAttribute("aria-current", "page");
-  byId(checks ? "scanTab" : "checksTab").removeAttribute("aria-current");
+let catalog = [];
+let libraryRequest = 0;
+
+function navigate(page) {
+  const reportOnly = page === "report";
+  const hasReport = current && !controller;
+  byId("scanPage").hidden = page === "checks" || (reportOnly && !hasReport);
+  byId("scanPage").classList.toggle("reportOnly", reportOnly);
+  byId("checksPage").hidden = page !== "checks";
+  byId("reportEmpty").hidden = !reportOnly || hasReport;
+  for (const [key, label] of [["scan","Scan console"], ["checks","Check library"], ["report","Latest report"]]) {
+    const button = byId(key + "Tab");
+    if (key === page) {
+      button.setAttribute("aria-current", "page");
+      byId("crumb").textContent = label;
+    } else button.removeAttribute("aria-current");
+  }
+  if (reportOnly && hasReport) render(current, true);
+  window.scrollTo(0, 0);
 }
-byId("scanTab").onclick = () => tab(false);
-byId("checksTab").onclick = async () => {
-  tab(true);
-  const catalog = byId("catalog");
-  catalog.textContent = "Loading checks…";
+byId("scanTab").onclick = byId("backScan").onclick = () => navigate("scan");
+byId("checksTab").onclick = byId("openLibrary").onclick = () => {
+  navigate("checks");
+  loadCatalog();
+};
+byId("reportTab").onclick = () => navigate("report");
+
+function renderLibrary() {
+  const term = byId("checkSearch").value.trim().toLowerCase();
+  const matches = catalog.filter(check =>
+    [check.title,check.id,check.severity,...(check.services || [])].join(" ").toLowerCase().includes(term));
+  byId("catalog").replaceChildren(...matches.map(check => {
+    const card = node("article", "");
+    card.append(badge(check.severity), node("h3", check.title),
+      node("p", [check.id, ...(check.services || [])].join(" · "), "endpoint"), node("p", check.fix));
+    return card;
+  }));
+  if (!matches.length) byId("catalog").textContent = "No matching checks.";
+}
+byId("checkSearch").oninput = renderLibrary;
+
+async function loadCatalog() {
+  const request = ++libraryRequest;
   try {
     const response = await fetch("/api/checks");
     if (!response.ok) throw new Error();
     const checks = await response.json();
-    catalog.replaceChildren(...checks.map(check => {
-      const card = node("article", "");
-      card.append(badge(check.severity), node("h3", check.title),
-        node("p", [check.id, ...(check.services || [])].join(" · "), "endpoint"), node("p", check.fix));
-      return card;
+    if (request !== libraryRequest) return;
+    catalog = checks;
+    renderLibrary();
+    const header = node("div", "", "checkRow head");
+    header.append(node("span","Check"),node("span","Services"),node("span","Severity"));
+    byId("inventoryRows").replaceChildren(header,...checks.map(check => {
+      const row = node("div", "", "checkRow");
+      const name = node("div", check.title);
+      name.append(node("small", check.id));
+      row.append(name, node("span",(check.services || []).join(", ") || "—"), badge(check.severity));
+      return row;
     }));
-  } catch { catalog.textContent = "Can't reach the checks catalog."; }
-};
+  } catch {
+    if (request !== libraryRequest) return;
+    byId("catalog").textContent = byId("inventoryRows").textContent = "Can't reach the checks catalog.";
+  }
+}
+loadCatalog();
+async function engineStatus() {
+  try {
+    const response = await fetch("/api/status");
+    if (!response.ok) throw new Error();
+    const status = await response.json();
+    byId("runner").textContent = status.runner;
+    byId("connection").textContent = "Local engine connected";
+    byId("connection").classList.add("ready");
+  } catch { byId("connection").textContent = "Engine unavailable"; }
+}
+engineStatus();
+function updateProfile() {
+  byId("profilePorts").textContent = byId("ports").value.trim() || "Top 1000";
+  byId("discovery").textContent = byId("skipPing").checked ? "Skipped" : "Enabled";
+  byId("profileTimeout").textContent = byId("timeout").value || "—";
+  byId("profileWorkers").textContent = (byId("workers").value || "—") + " workers";
+}
+byId("scanForm").addEventListener("input", updateProfile);
 
 function badge(level) {
   return node("span", level, "badge " + (levels.includes(level) ? level : "info"));
@@ -173,6 +233,7 @@ byId("scanForm").onsubmit = async event => {
     timeout:byId("timeout").value.trim(), workers:byId("workers").valueAsNumber,
     skip_ping:byId("skipPing").checked, force:byId("force").checked};
   controller = new AbortController();
+  byId("reportTab").disabled = true;
   started = performance.now();
   phase = "Starting";
   completed = 0;
@@ -195,6 +256,7 @@ byId("scanForm").onsubmit = async event => {
   } finally {
     clearInterval(timer);
     controller = null;
+    byId("reportTab").disabled = false;
     byId("settings").disabled = false;
     byId("stop").hidden = true;
   }
