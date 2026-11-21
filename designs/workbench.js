@@ -27,11 +27,20 @@ function save(key, value) {
 }
 
 const appearance = matchMedia("(prefers-color-scheme: light)");
+let themePreference = read("nuqs:theme");
 function applyAppearance() {
-  document.documentElement.classList.toggle("light", appearance.matches);
+  const light = themePreference === "light" || (themePreference !== "dark" && appearance.matches);
+  document.documentElement.classList.toggle("light", light);
+  byId("themeToggle").setAttribute("aria-pressed", String(!light));
+  byId("themeToggle").title = light ? "Switch to dark mode" : "Switch to light mode";
 }
 applyAppearance();
 appearance.addEventListener("change", applyAppearance);
+byId("themeToggle").onclick = () => {
+  themePreference = document.documentElement.classList.contains("light") ? "dark" : "light";
+  save("nuqs:theme", themePreference);
+  applyAppearance();
+};
 
 const narrowWindow = matchMedia("(max-width: 740px)");
 function sidebarKey() {
@@ -210,7 +219,7 @@ function renderFindings() {
   byId("findings").replaceChildren(...findings.map(findingCard));
   if (!findings.length) byId("findings").textContent = selected ? "No findings at this severity." : "No findings reported.";
 }
-for (const level of levels) byId("filter").add(new Option(level, level));
+for (const level of levels) byId("filter").add(new Option("Severity: " + level[0].toUpperCase() + level.slice(1), level));
 byId("filter").onchange = renderFindings;
 
 function raw(show) {
