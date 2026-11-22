@@ -6,12 +6,14 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/nuqs-org/nuqs/internal/nmap"
 	"github.com/nuqs-org/nuqs/internal/tools"
 )
 
@@ -21,18 +23,17 @@ const telnetHostXML = `<nmaprun><host><status state="up"/><address addr="127.0.0
 // slowRunner waits until released or cancelled.
 type slowRunner struct{ release chan struct{} }
 
-func (s *slowRunner) Run(ctx context.Context, _ []string) ([]byte, error) {
+func (s *slowRunner) Run(ctx context.Context, _ []string, out io.Writer) error {
 	select {
 	case <-s.release:
-		return []byte(telnetHostXML), nil
+		_, err := io.WriteString(out, telnetHostXML)
+		return err
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return ctx.Err()
 	}
 }
 
-func newScansHandler(t *testing.T, r interface {
-	Run(context.Context, []string) ([]byte, error)
-}) *Handler {
+func newScansHandler(t *testing.T, r nmap.Runner) *Handler {
 	t.Helper()
 	h := newTestHandler(r)
 	h.Scans = &tools.Scans{Service: h.Service}

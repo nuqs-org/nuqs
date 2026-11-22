@@ -5,6 +5,7 @@ package web
 import (
 	"context"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -35,15 +36,18 @@ type fakeRunner struct {
 	release chan struct{} // if set, wait for it or ctx
 }
 
-func (f *fakeRunner) Run(ctx context.Context, _ []string) ([]byte, error) {
+func (f *fakeRunner) Run(ctx context.Context, _ []string, out io.Writer) error {
 	if f.release != nil {
 		select {
 		case <-f.release:
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return ctx.Err()
 		}
 	}
-	return []byte(f.xml), f.err
+	if _, err := io.WriteString(out, f.xml); err != nil {
+		return err
+	}
+	return f.err
 }
 
 // brokenCheck always fails, so pages have a check error to show.

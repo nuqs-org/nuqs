@@ -5,6 +5,7 @@ package tools
 import (
 	"context"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -19,12 +20,13 @@ type blockingRunner struct {
 	xml     []byte
 }
 
-func (b *blockingRunner) Run(ctx context.Context, _ []string) ([]byte, error) {
+func (b *blockingRunner) Run(ctx context.Context, _ []string, out io.Writer) error {
 	select {
 	case <-b.release:
-		return b.xml, nil
+		_, err := out.Write(b.xml)
+		return err
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return ctx.Err()
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -28,9 +29,12 @@ type fakeRunner struct {
 	args []string
 }
 
-func (f *fakeRunner) Run(_ context.Context, args []string) ([]byte, error) {
+func (f *fakeRunner) Run(_ context.Context, args []string, out io.Writer) error {
 	f.args = args
-	return f.out, f.err
+	if _, err := out.Write(f.out); err != nil {
+		return err
+	}
+	return f.err
 }
 
 // newApp builds an App with a fake Nmap. Only the telnet check is used,

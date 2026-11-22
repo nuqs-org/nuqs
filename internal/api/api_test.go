@@ -5,6 +5,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -22,9 +23,12 @@ type fakeRunner struct {
 	args []string
 }
 
-func (f *fakeRunner) Run(_ context.Context, args []string) ([]byte, error) {
+func (f *fakeRunner) Run(_ context.Context, args []string, out io.Writer) error {
 	f.args = slices.Clone(args)
-	return f.xml, f.err
+	if _, err := out.Write(f.xml); err != nil {
+		return err
+	}
+	return f.err
 }
 
 func newTestHandler(r nmap.Runner) *Handler {
