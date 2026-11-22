@@ -12,17 +12,24 @@ Wireframes for each page are made in W1 and saved in `docs/ui/wireframes/`.
 
 Paste the token that `nuqs serve` prints on first start. Remembered in a cookie after that.
 
-### Home (W2)
+### Scans (W2)
 
-- The last scan: when it ran, how many hosts, findings by severity
-- **Top 3 fixes** from that scan, each with one line on why it matters
-- A big **New scan** button
+The home page, like the scan list in other scanners:
+
+- Every scan: name, targets, type, status with the real time it took, and findings by severity
+- A **New scan** button in the toolbar
+- With no scans yet, a **Scan 127.0.0.1** button that just starts one
 
 ### New scan (W2)
 
-- One box for the target: an IP, a network like `192.168.1.0/24`, a range or a hostname
-- A **Scan** button
-- **Advanced** (folded): ports, which checks to run, speed
+Two steps, the usual scanner flow:
+
+1. **Pick a scan type** from cards grouped into Discovery and Vulnerabilities: Discover hosts (coming with the discover work), Quick, Full and Custom
+2. **Settings** for that type, in sections on the left like System Settings:
+   - **Basic:** name, description and targets, with a live address count, a **Use my network** button, and a check before scans over 1,024 addresses
+   - **Discovery:** port presets in plain words, ping or not, faster service detection
+   - **Advanced:** check timeout and checks at once
+   - **Launch** and **Cancel** in the toolbar. Changing a setting keeps the type and adds a **modified** tag
 - If the target isn't in the allowed list, it says so before the scan starts, not after
 
 ### Scan results (W2)
