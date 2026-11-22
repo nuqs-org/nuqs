@@ -1,0 +1,37 @@
+<!-- One host: its open ports and services, what we found on it, and checks that couldn't finish. -->
+{{define "content"}}{{with .Data}}
+<section class="page">
+  <div class="pageHead">
+    <h1 class="mono">{{.Host.Address}}</h1>
+    {{if .Host.Hostnames}}<p>{{join .Host.Hostnames ", "}}</p>{{end}}
+    <p>{{template "counts" .Counts}}</p>
+  </div>
+  <h2 class="groupTitle">Findings</h2>
+  {{if .Findings}}<div class="findingList">{{range .Findings}}
+    <article class="card finding">
+      <header><span class="badge {{badgeClass .Severity.String}}">{{.Severity}}</span><h3><a href="/scans/{{$.Data.ScanID}}/vulns/{{.CheckID}}">{{.Title}}</a></h3></header>
+      <p class="mono small">port {{.Port}}/{{.Protocol}} · {{.CheckID}}{{if .Confidence}} · <span title="{{if eq .Confidence "confirmed"}}We saw this happen.{{else}}Worked out from the version number or the port, not seen directly.{{end}}">{{.Confidence}}</span>{{end}}</p>
+      <p><b>What we saw</b> {{.Evidence}}</p>
+      <p><b>Fix</b> {{.Fix}}</p>
+      <button type="button" class="copy" data-fix="{{.Fix}}">Copy fix</button>
+    </article>{{end}}
+  </div>{{else}}<p class="emptyRow card">Nothing found on this host.</p>{{end}}
+  <h2 class="groupTitle">Open ports</h2>
+  <div class="tableCard">
+    {{if .Host.Services}}<table class="list">
+      <thead><tr><th>Port</th><th>Service</th><th class="wide">Software</th></tr></thead>
+      <tbody>{{range .Host.Services}}<tr>
+        <td class="mono">{{.Port}}/{{.Protocol}}</td>
+        <td>{{.Name}}{{if eq .Tunnel "ssl"}} <small>over TLS</small>{{end}}{{if .Guessed}} <small title="Nmap only guessed this from the port number">guessed</small>{{end}}</td>
+        <td>{{.Product}} {{.Version}}</td>
+      </tr>{{end}}</tbody>
+    </table>{{else}}<p class="emptyRow">No open ports.</p>{{end}}
+  </div>
+  {{if .Errors}}
+  <div class="card warnCard">
+    <h2>{{len .Errors}} {{if eq (len .Errors) 1}}check{{else}}checks{{end}} couldn't finish</h2>
+    <ul class="errorList">{{range .Errors}}<li><span class="mono">port {{.Port}}</span> · {{.CheckID}} · {{.Error}}</li>{{end}}</ul>
+  </div>
+  {{end}}
+</section>
+{{end}}{{end}}

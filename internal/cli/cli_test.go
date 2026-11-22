@@ -247,13 +247,21 @@ func TestServeCommand(t *testing.T) {
 			t.Fatalf("addr=%q stdout=%q", servedAddr, out.String())
 		}
 
-		for _, path := range []string{"/", "/api/status", "/api/checks", "/partials/checks", "/static/nuqs.css", "/static/htmx.min.js"} {
+		for _, path := range []string{"/scans", "/scans/new", "/checks", "/api/status", "/api/checks", "/api/scans", "/partials/checks", "/static/nuqs.css", "/static/htmx.min.js"} {
 			req := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:9123"+path, nil)
 			rec := httptest.NewRecorder()
 			servedHandler.ServeHTTP(rec, req)
 			if rec.Code != http.StatusOK {
 				t.Errorf("GET %s: got %d, want 200", path, rec.Code)
 			}
+		}
+
+		// Another site's name pointed at 127.0.0.1 is refused.
+		req := httptest.NewRequest(http.MethodGet, "http://evil.example:9123/scans", nil)
+		rec := httptest.NewRecorder()
+		servedHandler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("foreign Host: got %d, want 403", rec.Code)
 		}
 	})
 

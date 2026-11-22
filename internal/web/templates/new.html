@@ -1,0 +1,16 @@
+<!-- New scan: pick a scan type first, then fill in its settings. -->
+{{define "content"}}{{with .Data}}
+<section class="page">
+  <div class="pageHead"><h1>New scan</h1><p>Pick a scan type. You can change its settings on the next page.</p></div>
+  <h2 class="groupTitle">Discovery</h2>
+  <div class="gallery">{{range .Discovery}}{{template "card" .}}{{end}}</div>
+  <h2 class="groupTitle">Vulnerabilities</h2>
+  <div class="gallery">{{range .Vulnerabilities}}{{template "card" .}}{{end}}</div>
+</section>
+{{end}}{{end}}
+{{define "card"}}{{if .Soon}}<div class="typeCard disabled" aria-disabled="true">{{else}}<a class="typeCard" href="/scans/new/{{.ID}}">{{end}}
+  <span class="typeIcon {{.ID}}" aria-hidden="true"></span>
+  <span class="typeName">{{.Name}}{{if .Soon}} <span class="soon">Coming soon</span>{{end}}</span>
+  <span class="typeDesc">{{.Desc}}</span>
+  {{if .Time}}<span class="typeTime">{{.Time}}</span>{{end}}
+{{if .Soon}}</div>{{else}}</a>{{end}}{{end}}

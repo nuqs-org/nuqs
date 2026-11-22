@@ -34,6 +34,8 @@ type Handler struct {
 	Service  *tools.Service
 	Addr     string
 	OnReport func(rep *engine.Report, message string)
+	// Scans runs the scans started from the web UI. Nil leaves out /api/scans.
+	Scans *tools.Scans
 }
 
 // New constructs an API handler for svc bound to addr.
@@ -46,6 +48,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/status", h.handleStatus)
 	mux.HandleFunc("/api/checks", h.handleChecks)
 	mux.HandleFunc("/api/scan", h.handleScan)
+	h.registerScans(mux)
 }
 
 // ServeHTTP dispatches API requests on a standalone handler.

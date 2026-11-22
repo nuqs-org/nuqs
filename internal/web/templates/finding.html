@@ -1,0 +1,26 @@
+<!-- One vulnerability: what it is, how to fix it, and every host that has it with what we saw there. -->
+{{define "content"}}{{with .Data}}
+<section class="page">
+  <div class="pageHead">
+    <p><span class="badge {{badgeClass .Severity}}">{{.Severity}}</span> <span class="mono small">{{.CheckID}}</span></p>
+    <h1>{{.Title}}</h1>
+  </div>
+  <div class="card">
+    <h2>How to fix it</h2>
+    <p>{{.Fix}}</p>
+    <button type="button" class="copy" data-fix="{{.Fix}}">Copy fix</button>
+    {{if .Looks}}<p class="small subtle">This check looks at {{.Looks}}.</p>{{end}}
+  </div>
+  <h2 class="groupTitle">Found on {{len .Instances}} {{if eq (len .Instances) 1}}host{{else}}hosts{{end}}</h2>
+  <div class="tableCard">
+    <table class="list">
+      <thead><tr><th>Host</th><th class="wide">What we saw</th><th>Confidence</th></tr></thead>
+      <tbody>{{range .Instances}}<tr>
+        <td><a class="mono" href="/scans/{{$.Data.ScanID}}/hosts/{{.Host}}">{{.Host}}:{{.Port}}</a></td>
+        <td>{{.Evidence}}</td>
+        <td><span title="{{if eq .Confidence "confirmed"}}We saw this happen.{{else}}Worked out from the version number or the port, not seen directly.{{end}}">{{.Confidence}}</span></td>
+      </tr>{{end}}</tbody>
+    </table>
+  </div>
+</section>
+{{end}}{{end}}

@@ -234,13 +234,15 @@ func (a *App) serve(ctx context.Context, args []string) int {
 		MaxWorkers:   128,
 		StartedAt:    time.Now(),
 	}
-	webHandler, err := web.New(svc, *addr)
+	scans := &tools.Scans{Service: svc}
+	defer scans.StopAll() // don't leave Nmap running after the server stops
+	webHandler, err := web.New(svc, scans, *addr)
 	if err != nil {
 		fmt.Fprintf(a.Stderr, "error: %v\n", err)
 		return ExitError
 	}
 	apiHandler := api.New(svc, *addr)
-	apiHandler.OnReport = webHandler.SetReport
+	apiHandler.Scans = scans
 
 	mux := http.NewServeMux()
 	apiHandler.Register(mux)
@@ -251,7 +253,7 @@ func (a *App) serve(ctx context.Context, args []string) int {
 	if listen == nil {
 		listen = defaultListenAndServe
 	}
-	if err := listen(ctx, *addr, mux); err != nil {
+	if err := listen(ctx, *addr, api.LocalOnly(*addr, mux)); err != nil {
 		fmt.Fprintf(a.Stderr, "error: server terminated: %v\n", err)
 		return ExitError
 	}
