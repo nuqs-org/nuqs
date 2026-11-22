@@ -1,0 +1,11 @@
+<!-- Check library: every check Nuqs has, searchable. -->
+{{define "content"}}
+<section class="page">
+  <div class="pageHead"><h1>Check library</h1><p>Every check in this version of Nuqs, and what it looks at.</p></div>
+  <label class="searchLabel">
+    <span class="visuallyHidden">Search checks</span>
+    <input type="search" id="checkSearch" name="q" hx-get="/partials/checks" hx-trigger="input changed delay:150ms, search" hx-target="#catalog" hx-swap="innerHTML" placeholder="Search by name, service, port or severity">
+  </label>
+  <div id="catalog" class="checkGrid" aria-live="polite">{{template "checks_library.html" .Data}}</div>
+</section>
+{{end}}

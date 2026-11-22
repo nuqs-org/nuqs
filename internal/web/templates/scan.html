@@ -1,0 +1,86 @@
+<!-- One scan: hosts and vulnerabilities tabs, with scan details and the severity ring on the side. -->
+{{define "actions"}}{{with .Data}}{{if eq .Status "running"}}<button type="button" id="stopScan" data-id="{{.ID}}">Stop</button>{{else if .Report}}<a class="button" href="/api/scans/{{.ID}}/report" download>Download JSON</a>{{end}}<a class="button primary" href="/scans/new">New scan</a>{{end}}{{end}}
+{{define "content"}}{{with .Data}}
+<section class="page" {{if eq .Status "running"}}data-watch="{{.ID}}"{{end}}>
+  <div class="pageHead">
+    <h1>{{.Name}}</h1>
+    {{if .Description}}<p>{{.Description}}</p>{{end}}
+    <p class="bigStatus"><span class="statusPill {{.Class}}" id="statusLabel">{{.Label}}</span></p>
+  </div>
+
+  {{if eq .Status "running"}}
+  <div class="card progressCard" aria-live="polite">
+    <div class="spinner" aria-hidden="true"></div>
+    <div>
+      <p class="phase" id="phase">{{.Phase}}</p>
+      <p class="progressNumbers"><span id="checksLine">{{if .ChecksTotal}}{{.ChecksDone}} of {{.ChecksTotal}} checks done{{end}}</span> <span id="elapsed" class="mono"></span></p>
+      <div class="progressBar"><i id="progressFill" style="width:0%"></i></div>
+    </div>
+  </div>
+  {{else if eq .Status "failed"}}
+  <div class="card errorCard" role="alert"><h2>The scan couldn't run</h2><p>{{.Error}}</p></div>
+  {{end}}
+
+  <div class="resultsLayout">
+    <div class="resultsMain">
+      {{if .Report}}
+      <nav class="segmented" aria-label="Results">
+        <a href="/scans/{{.ID}}"{{if eq .Tab "hosts"}} aria-current="page"{{end}}>Hosts <span class="count">{{len .Hosts}}</span></a>
+        <a href="/scans/{{.ID}}?tab=vulns"{{if eq .Tab "vulns"}} aria-current="page"{{end}}>Vulnerabilities <span class="count">{{len .Vulns}}</span></a>
+      </nav>
+      {{if eq .Tab "hosts"}}
+      <div class="tableCard">
+        {{if .Hosts}}<table class="list">
+          <thead><tr><th>Host</th><th>Open ports</th><th class="wide">Findings</th></tr></thead>
+          <tbody>{{$id := .ID}}{{range .Hosts}}<tr class="rowLink">
+            <td><a href="/scans/{{$id}}/hosts/{{.Address}}"><strong class="mono">{{.Address}}</strong></a>{{if .Hostnames}}<small>{{join .Hostnames ", "}}</small>{{end}}</td>
+            <td>{{.Open}}</td>
+            <td>{{template "sevbar" .Counts}}</td>
+          </tr>{{end}}</tbody>
+        </table>{{else}}<p class="emptyRow">No hosts answered. If they block ping, turn on "Scan hosts even if they don't answer ping" under Discovery.</p>{{end}}
+      </div>
+      {{else}}
+      <div class="tableCard">
+        {{if .Vulns}}<table class="list">
+          <thead><tr><th class="narrow">Severity</th><th class="wide">Name</th><th>Hosts</th></tr></thead>
+          <tbody>{{$id := .ID}}{{range .Vulns}}<tr class="rowLink">
+            <td><span class="badge {{badgeClass .Severity}}">{{.Severity}}</span></td>
+            <td><a href="/scans/{{$id}}/vulns/{{.CheckID}}"><strong>{{.Title}}</strong></a><small class="mono">{{.CheckID}}</small></td>
+            <td>{{.Hosts}}</td>
+          </tr>{{end}}</tbody>
+        </table>{{else}}<p class="emptyRow">Nothing found. Every check that ran came back clean.</p>{{end}}
+      </div>
+      {{end}}
+      {{if .Errors}}
+      <div class="card warnCard">
+        <h2>{{len .Errors}} {{if eq (len .Errors) 1}}check{{else}}checks{{end}} couldn't finish</h2>
+        <p>These aren't findings. We couldn't tell either way, so look at these by hand.</p>
+        <ul class="errorList">{{range .Errors}}<li><span class="mono">{{.Host}}:{{.Port}}</span> · {{.CheckID}} · {{.Error}}</li>{{end}}</ul>
+      </div>
+      {{end}}
+      {{else if eq .Status "running"}}
+      <p class="emptyRow">Hosts and findings show up here when the scan finishes.</p>
+      {{else if eq .Status "stopped"}}
+      <p class="emptyRow card">Stopped before Nmap finished finding hosts, so there's nothing to show. <a href="/scans/new">Start a new scan</a></p>
+      {{end}}
+    </div>
+    <aside class="card detailsCard">
+      <h2>Scan details</h2>
+      <dl>{{range .Details}}<div><dt>{{.Label}}</dt><dd>{{.Value}}</dd></div>{{end}}</dl>
+      {{if .Report}}
+      <h2>Findings</h2>
+      <div class="donutWrap">
+        <div class="donut" style="{{.Donut}}"><span><strong>{{.Counts.Total}}</strong><small>total</small></span></div>
+        <ul class="legend">
+          <li><i class="critical"></i>Critical <b>{{.Counts.Critical}}</b></li>
+          <li><i class="high"></i>High <b>{{.Counts.High}}</b></li>
+          <li><i class="medium"></i>Medium <b>{{.Counts.Medium}}</b></li>
+          <li><i class="low"></i>Low <b>{{.Counts.Low}}</b></li>
+          <li><i class="info"></i>Info <b>{{.Counts.Info}}</b></li>
+        </ul>
+      </div>
+      {{end}}
+    </aside>
+  </div>
+</section>
+{{end}}{{end}}

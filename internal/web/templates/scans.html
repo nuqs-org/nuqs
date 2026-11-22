@@ -1,0 +1,33 @@
+<!-- Scans: the home page, every scan with its status and what it found. -->
+{{define "actions"}}<a class="button primary" href="/scans/new">New scan</a>{{end}}
+{{define "content"}}{{with .Data}}
+<section class="page" {{if .Running}}data-watch="{{.Running}}"{{end}}>
+  <div class="pageHead"><h1>Scans</h1></div>
+  {{if .Rows}}
+  <div class="tableCard">
+    <table class="list">
+      <thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Findings</th><th>Started</th></tr></thead>
+      <tbody>
+      {{range .Rows}}<tr class="rowLink">
+        <td><a href="/scans/{{.ID}}"><strong>{{.Name}}</strong></a><small>{{join .Targets ", "}}</small></td>
+        <td>{{.KindName}}</td>
+        <td><span class="statusPill {{.Class}}">{{.Label}}</span></td>
+        <td>{{if eq .Status "running"}}<span class="none">—</span>{{else}}{{template "counts" .Counts}}{{end}}</td>
+        <td class="mono">{{clock .Started}}</td>
+      </tr>{{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <div class="emptyState">
+    <h2>No scans yet</h2>
+    <p>Start with a scan of this computer to see how it works, it takes a few seconds.</p>
+    <div class="emptyActions">
+      <button type="button" class="primary" id="tryScan" data-target="{{.SuggestedTarget}}">Scan {{.SuggestedTarget}}</button>
+      <a class="button" href="/scans/new">Choose a scan type</a>
+    </div>
+    <p class="formError" id="tryError" role="alert" hidden></p>
+  </div>
+  {{end}}
+</section>
+{{end}}{{end}}

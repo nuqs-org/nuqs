@@ -1,0 +1,7 @@
+<!-- Searchable check library cards rendered by Go html/template. -->
+{{if .}}{{range .}}<article>
+  <span class="badge {{badgeClass .Severity}}">{{.Severity}}</span>
+  <h3>{{.Title}}</h3>
+  <p class="endpoint">{{.ID}}{{if .Services}} · {{join .Services " · "}}{{end}}{{if .Ports}} · ports {{joinInts .Ports ", "}}{{end}}</p>
+  <p>{{.Fix}}</p>
+</article>{{end}}{{else}}No matching checks.{{end}}

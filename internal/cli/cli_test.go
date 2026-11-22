@@ -7,7 +7,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"slices"
 	"strings"
@@ -27,12 +28,9 @@ type fakeRunner struct {
 	args []string
 }
 
-func (f *fakeRunner) Run(_ context.Context, args []string, out io.Writer) error {
+func (f *fakeRunner) Run(_ context.Context, args []string) ([]byte, error) {
 	f.args = args
-	if _, err := out.Write(f.out); err != nil {
-		return err
-	}
-	return f.err
+	return f.out, f.err
 }
 
 // newApp builds an App with a fake Nmap. Only the telnet check is used,
@@ -214,5 +212,99 @@ func TestOtherCommands(t *testing.T) {
 func TestPlural(t *testing.T) {
 	if plural(1, "host", "hosts") != "host" || plural(0, "host", "hosts") != "hosts" || plural(2, "host", "hosts") != "hosts" {
 		t.Error("plural is wrong")
+	}
+}
+
+func TestServeCommand(t *testing.T) {
+	t.Run("help", func(t *testing.T) {
+		app, _, errOut := newApp(t, &fakeRunner{})
+		if code := app.Run(context.Background(), []string{"serve", "-h"}); code != ExitOK {
+			t.Fatalf("serve -h exit %d", code)
+		}
+		if !strings.Contains(errOut.String(), "-addr") {
+			t.Errorf("help should list flags:\n%s", errOut)
+		}
+	})
+
+	t.Run("serves web UI and JSON API on one mux", func(t *testing.T) {
+		r := &fakeRunner{}
+		app, out, errOut := newApp(t, r)
+		app.LookPath = func(file string) (string, error) { return "/usr/bin/" + file, nil }
+
+		var servedAddr string
+		var servedHandler http.Handler
+		app.ListenAndServe = func(_ context.Context, addr string, h http.Handler) error {
+			servedAddr = addr
+			servedHandler = h
+			return nil
+		}
+
+		code := app.Run(context.Background(), []string{"serve", "--addr", "127.0.0.1:9123", "--allow", "127.0.0.0/8"})
+		if code != ExitOK {
+			t.Fatalf("exit %d, stderr:\n%s", code, errOut)
+		}
+		if servedAddr != "127.0.0.1:9123" || !strings.Contains(out.String(), "http://127.0.0.1:9123") {
+			t.Fatalf("addr=%q stdout=%q", servedAddr, out.String())
+		}
+
+		for _, path := range []string{"/scans", "/scans/new", "/checks", "/api/status", "/api/checks", "/api/scans", "/partials/checks", "/static/nuqs.css", "/static/htmx.min.js"} {
+			req := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:9123"+path, nil)
+			rec := httptest.NewRecorder()
+			servedHandler.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Errorf("GET %s: got %d, want 200", path, rec.Code)
+			}
+		}
+
+		// Another site's name pointed at 127.0.0.1 is refused.
+		req := httptest.NewRequest(http.MethodGet, "http://evil.example:9123/scans", nil)
+		rec := httptest.NewRecorder()
+		servedHandler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("foreign Host: got %d, want 403", rec.Code)
+		}
+	})
+
+	t.Run("rejects bad flags, extra args and invalid allow scope", func(t *testing.T) {
+		cases := [][]string{
+			{"serve", "--nope"},
+			{"serve", "extra"},
+			{"serve", "--allow", "not-a-cidr"},
+			{"serve", "--addr", "0.0.0.0:9002"},
+			{"serve", "--addr", ":9002"},
+			{"serve", "--addr", "192.168.1.5:9002"},
+			{"serve", "--addr", "127.0.0.1"},
+			{"serve", "--addr", "127.0.0.1:99999"},
+		}
+		for _, args := range cases {
+			app, _, _ := newApp(t, &fakeRunner{})
+			if code := app.Run(context.Background(), args); code != ExitUsage {
+				t.Errorf("%v: exit %d, want %d", args, code, ExitUsage)
+			}
+		}
+	})
+
+	t.Run("fails cleanly when nmap is missing or server errors", func(t *testing.T) {
+		app, _, errOut := newApp(t, &fakeRunner{})
+		app.LookPath = func(string) (string, error) { return "", errors.New("not found") }
+		if code := app.Run(context.Background(), []string{"serve"}); code != ExitError ||
+			!strings.Contains(errOut.String(), "Nmap isn't installed") || !strings.Contains(errOut.String(), "--nmap") {
+			t.Fatalf("missing nmap: code=%d stderr=%s", code, errOut)
+		}
+
+		app2, _, errOut2 := newApp(t, &fakeRunner{})
+		app2.LookPath = func(file string) (string, error) { return file, nil }
+		app2.ListenAndServe = func(context.Context, string, http.Handler) error { return errors.New("port busy") }
+		if code := app2.Run(context.Background(), []string{"serve"}); code != ExitError || !strings.Contains(errOut2.String(), "port busy") {
+			t.Fatalf("listen error: code=%d stderr=%s", code, errOut2)
+		}
+	})
+}
+
+func TestCheckLoopback(t *testing.T) {
+	for _, ok := range []string{"127.0.0.1:9002", "127.5.5.5:80", "localhost:9002", "[::1]:9002"} {
+		if err := checkLoopback(ok); err != nil {
+			t.Errorf("%s should be allowed: %v", ok, err)
+		}
 	}
 }

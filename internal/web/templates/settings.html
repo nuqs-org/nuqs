@@ -1,0 +1,75 @@
+<!-- Settings for a new scan, in sections like System Settings: Basic, Discovery and Advanced. -->
+{{define "actions"}}<a class="button" href="/scans">Cancel</a><button type="submit" form="scanForm" class="primary" id="launch">Launch</button>{{end}}
+{{define "content"}}{{with .Data}}
+<section class="page settingsPage">
+  <div class="pageHead">
+    <h1>New {{lower .Kind.Name}} <span class="modifiedTag" id="modifiedTag" hidden>modified</span></h1>
+    <p>{{.Kind.Desc}} <a href="/scans/new">Change type</a></p>
+  </div>
+  <p class="formError" id="formError" role="alert" hidden></p>
+  <form id="scanForm" class="settings" data-kind="{{.Kind.ID}}" data-open="{{.OpenSection}}" novalidate>
+    <nav class="sections" aria-label="Settings">
+      <a href="#basic" data-section="basic">Basic</a>
+      <a href="#discovery" data-section="discovery">Discovery</a>
+      <a href="#advanced" data-section="advanced">Advanced</a>
+    </nav>
+    <div class="sectionPanes">
+      <fieldset class="pane" id="basic">
+        <legend>Basic</legend>
+        <label class="field">Name
+          <input id="name" maxlength="100" placeholder="Like Office router" autocomplete="off">
+          <small>Optional. Makes it easy to find later, otherwise the target is used.</small>
+        </label>
+        <label class="field">Description
+          <textarea id="description" maxlength="500" rows="2" placeholder="Optional"></textarea>
+        </label>
+        <div class="field">
+          <label for="target">Targets</label>
+          <input id="target" required placeholder="{{.SuggestedTarget}}" autocomplete="off" spellcheck="false" aria-describedby="targetInfo scope">
+          <p id="targetInfo" class="targetInfo" aria-live="polite"></p>
+          <small id="scope">An IP, a range like 10.0.0.1-20, a network like 10.0.0.0/24 or a hostname. {{.ScopeHint}}</small>
+          {{if .LocalNetwork}}{{if .LocalNetworkAllowed}}<button type="button" id="useNetwork" class="linkButton" data-network="{{.LocalNetwork}}">Use my network ({{.LocalNetwork}})</button>{{else}}<small class="networkHint">To scan your network, start Nuqs with <code>nuqs serve --allow {{.LocalNetwork}}</code></small>{{end}}{{end}}
+          <label class="check largeNet" id="largeNet" hidden>
+            <input type="checkbox" id="force">
+            <span><strong id="largeNetText">Scan all of these addresses</strong><small>Big scans take a while and make a lot of traffic, so we ask first.</small></span>
+          </label>
+        </div>
+      </fieldset>
+      <fieldset class="pane" id="discovery">
+        <legend>Discovery</legend>
+        <label class="field">Ports
+          <select id="portPreset">
+            <option value="top1000"{{if eq .PortPreset "top1000"}} selected{{end}}>The 1,000 most common ports</option>
+            <option value="top100"{{if eq .PortPreset "top100"}} selected{{end}}>The 100 most common ports (faster)</option>
+            <option value="web">Web ports (80, 443, 8080, 8443)</option>
+            <option value="all">All 65,535 ports (slow)</option>
+            <option value="custom">Let me type them</option>
+          </select>
+        </label>
+        <label class="field" id="customPortsWrap" hidden>Your ports
+          <input id="ports" placeholder="22,80,443 or 1-1000" autocomplete="off">
+        </label>
+        <label class="check">
+          <input type="checkbox" id="skipPing">
+          <span><strong>Scan hosts even if they don't answer ping</strong><small>Finds hosts behind firewalls that block ping, but it's slower.</small></span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="lightVersion"{{if .LightVersion}} checked{{end}}>
+          <span><strong>Faster service detection</strong><small>Tries fewer ways to name each service, so some versions may be missed.</small></span>
+        </label>
+      </fieldset>
+      <fieldset class="pane" id="advanced">
+        <legend>Advanced</legend>
+        <label class="field">Check timeout
+          <input id="timeout" value="30s" required>
+          <small>The longest each check may take, like 30s or 1m.</small>
+        </label>
+        <label class="field">Checks at once
+          <input id="workers" type="number" min="1" max="128" value="10" required>
+          <small>How many checks run at the same time, from 1 to 128.</small>
+        </label>
+      </fieldset>
+    </div>
+  </form>
+</section>
+{{end}}{{end}}

@@ -1,0 +1,61 @@
+<!-- The frame every page shares: sidebar, toolbar with the page path, and the page itself. -->
+{{define "layout"}}<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="htmx-config" content='{"allowEval":false,"allowScriptTags":false,"includeIndicatorStyles":false}'>
+<link rel="icon" href="/static/nuqs-logo.png" type="image/png">
+<title>{{.Title}} · Nuqs</title>
+<link rel="stylesheet" href="/static/nuqs.css">
+<script defer src="/static/htmx.min.js"></script>
+<script defer src="/static/app.js"></script>
+</head>
+<body>
+<aside class="rail">
+  <div class="railHead">
+    <a href="/scans" class="brandLink"><img class="brand" src="/static/nuqs-logo.png" width="56" height="56" alt="Nuqs"></a>
+    <button type="button" id="railToggle" aria-controls="workspaceNav" aria-expanded="true" aria-label="Collapse sidebar">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="4"/><path d="M9 4v16m7-10-2 2 2 2"/></svg>
+    </button>
+  </div>
+  <nav id="workspaceNav" aria-label="Workspace">
+    <a href="/scans" title="Scans"{{if eq .Nav "scans"}} aria-current="page"{{end}}>
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5M7 10h6m-3-3v6"/></svg>
+      <span class="navLabel">Scans</span>
+    </a>
+    <a href="/checks" title="Check library"{{if eq .Nav "checks"}} aria-current="page"{{end}}>
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m6 9 1 1 2-2m2 1h6m-11 6 1 1 2-2m2 1h6"/></svg>
+      <span class="navLabel">Check library</span>
+    </a>
+  </nav>
+  <div class="railFoot">
+    <span class="connection" id="connection">Checking engine…</span>
+    <button id="profileButton" type="button" aria-haspopup="dialog" aria-label="Edit local profile">
+      <span class="avatar" aria-hidden="true" id="initials">LU</span>
+      <span id="profileName" class="navLabel">Local user</span>
+    </button>
+  </div>
+</aside>
+<header class="top">
+  <nav class="crumbs" aria-label="You are here">{{range $i, $c := .Crumbs}}{{if $i}}<span class="sep" aria-hidden="true">›</span>{{end}}{{if $c.Href}}<a href="{{$c.Href}}">{{$c.Label}}</a>{{else}}<strong aria-current="page">{{$c.Label}}</strong>{{end}}{{end}}</nav>
+  <div class="toolbarActions">
+    {{block "actions" .}}{{end}}
+    <button id="themeToggle" type="button" class="iconButton" aria-label="Switch to dark mode" title="Switch to dark mode" aria-pressed="false">
+      <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M20 14a8.4 8.4 0 0 1-10-10 8.5 8.5 0 1 0 10 10Z"/></svg>
+    </button>
+  </div>
+</header>
+<main id="main">{{template "content" .}}</main>
+<dialog id="profileDialog" aria-labelledby="profileTitle">
+  <h2 id="profileTitle">Local profile</h2>
+  <form id="profileForm">
+    <label for="displayName">Display name</label>
+    <input id="displayName" maxlength="40" required autocomplete="off" aria-describedby="profileHint">
+    <small id="profileHint">Saved in this browser.</small>
+    <div class="dialogActions">
+      <button type="button" id="cancelProfile">Cancel</button>
+      <button type="submit" class="primary">Save</button>
+    </div>
+  </form>
+</dialog>
+</body></html>{{end}}

@@ -10,13 +10,22 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
+	"net/netip"
+	"os"
+	"os/exec"
+	"strconv"
 	"time"
 
+	"github.com/nuqs-org/nuqs/internal/api"
 	"github.com/nuqs-org/nuqs/internal/check"
 	"github.com/nuqs-org/nuqs/internal/engine"
 	"github.com/nuqs-org/nuqs/internal/nmap"
 	"github.com/nuqs-org/nuqs/internal/output"
 	"github.com/nuqs-org/nuqs/internal/target"
+	"github.com/nuqs-org/nuqs/internal/tools"
+	"github.com/nuqs-org/nuqs/internal/web"
 )
 
 // Exit codes returned by Run.
@@ -35,16 +44,21 @@ type App struct {
 	NewRunner func(path string) nmap.Runner
 	// Checks returns the checks to run.
 	Checks func() []check.Check
+	// LookPath resolves the nmap binary for "nuqs serve". Nil defaults to exec.LookPath.
+	LookPath func(file string) (string, error)
+	// ListenAndServe starts the HTTP server for "nuqs serve". Nil defaults to net/http.
+	ListenAndServe func(ctx context.Context, addr string, h http.Handler) error
 }
 
 const usage = `Nuqs is a non-overengineered vulnerability assessment tool.
 
 Usage:
   nuqs scan [flags] <target>...   scan targets (IP, CIDR, range like 10.0.0.1-20, or hostname)
+  nuqs serve [flags]              start the local web UI and JSON API server
   nuqs checks                     list the built-in checks
   nuqs version                    print the version
 
-Run "nuqs scan -h" to see the scan flags.
+Run "nuqs scan -h" or "nuqs serve -h" to see the flags.
 `
 
 // Run runs the command in args (without the program name) and returns the exit code.
@@ -56,6 +70,8 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	switch args[0] {
 	case "scan":
 		return a.scan(ctx, args[1:])
+	case "serve":
+		return a.serve(ctx, args[1:])
 	case "checks":
 		return a.listChecks()
 	case "version", "--version", "-v":
@@ -71,8 +87,8 @@ func (a *App) Run(ctx context.Context, args []string) int {
 }
 
 func (a *App) listChecks() int {
-	for _, c := range a.Checks() {
-		in := c.Info()
+	svc := &tools.Service{Checks: a.Checks}
+	for _, in := range svc.ListChecks() {
 		fmt.Fprintf(a.Stdout, "%-24s %-8s %s\n", in.ID, in.Severity, in.Title)
 	}
 	return ExitOK
@@ -129,14 +145,18 @@ func (a *App) scan(ctx context.Context, args []string) int {
 		return ExitUsage
 	}
 
-	eng := &engine.Engine{
-		Scanner:      nmap.Scanner{Runner: a.NewRunner(*nmapPath), Options: nmap.Options{Ports: *ports, SkipPing: *skipPing}},
-		Checks:       a.Checks(),
-		Workers:      *workers,
-		CheckTimeout: *timeout,
-		OnEvent:      a.progress,
+	svc := &tools.Service{
+		Version:   a.Version,
+		NewRunner: func() nmap.Runner { return a.NewRunner(*nmapPath) },
+		Checks:    a.Checks,
 	}
-	rep, err := eng.Run(ctx, targets)
+	rep, err := svc.RunValidated(ctx, tools.ValidatedScan{
+		Targets:  targets,
+		Ports:    *ports,
+		SkipPing: *skipPing,
+		Workers:  *workers,
+		Timeout:  *timeout,
+	}, a.progress)
 	if rep == nil {
 		fmt.Fprintln(a.Stderr, "error:", err)
 		return ExitError
@@ -158,6 +178,137 @@ func (a *App) scan(ctx context.Context, args []string) int {
 		return ExitError
 	}
 	return ExitOK
+}
+
+func (a *App) serve(ctx context.Context, args []string) int {
+	defaultAddr := "127.0.0.1:9002"
+	if envPort := os.Getenv("PORT"); envPort != "" {
+		defaultAddr = "127.0.0.1:" + envPort
+	}
+	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
+	fs.SetOutput(a.Stderr)
+	addr := fs.String("addr", defaultAddr, "local address to listen on")
+	nmapPath := fs.String("nmap", os.Getenv("NUQS_NMAP_PATH"), "path to the nmap binary (default: NUQS_NMAP_PATH or nmap from PATH)")
+	allowRaw := fs.String("allow", os.Getenv("NUQS_ALLOWED_TARGETS"), "comma-separated allowed IPs or CIDRs (default: 127.0.0.0/8 loopback only)")
+	fs.Usage = func() {
+		fmt.Fprintln(a.Stderr, "Usage: nuqs serve [flags]")
+		fs.PrintDefaults()
+	}
+
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return ExitOK
+		}
+		return ExitUsage
+	}
+	if fs.NArg() > 0 {
+		fmt.Fprintf(a.Stderr, "unexpected argument %q\n", fs.Arg(0))
+		fs.Usage()
+		return ExitUsage
+	}
+
+	if err := checkLoopback(*addr); err != nil {
+		fmt.Fprintln(a.Stderr, "error:", err)
+		return ExitUsage
+	}
+	allowed, err := tools.ParseAllowedScope(*allowRaw)
+	if err != nil {
+		fmt.Fprintln(a.Stderr, "error:", err)
+		return ExitUsage
+	}
+
+	bin := *nmapPath
+	if bin == "" {
+		bin = "nmap"
+	}
+	lookPath := a.LookPath
+	if lookPath == nil {
+		lookPath = exec.LookPath
+	}
+	resolvedNmap, err := lookPath(bin)
+	if err != nil {
+		fmt.Fprintf(a.Stderr, "error: Nmap isn't installed or wasn't found (%v). %s, or pass --nmap /path/to/nmap.\n", err, tools.NmapInstallHint())
+		return ExitError
+	}
+
+	svc := &tools.Service{
+		Version:      a.Version,
+		RunnerName:   "nmap",
+		NewRunner:    func() nmap.Runner { return a.NewRunner(resolvedNmap) },
+		Checks:       a.Checks,
+		AllowedScope: allowed,
+		EnforceScope: true,
+		MaxWorkers:   128,
+		StartedAt:    time.Now(),
+	}
+	scans := &tools.Scans{Service: svc}
+	// On Ctrl+C stop running scans first. Their live pages then get a last
+	// update and close, so the server can shut down right away.
+	stop := context.AfterFunc(ctx, scans.StopAll)
+	defer stop()
+	defer scans.StopAll()
+	webHandler, err := web.New(svc, scans, *addr)
+	if err != nil {
+		fmt.Fprintf(a.Stderr, "error: %v\n", err)
+		return ExitError
+	}
+	apiHandler := api.New(svc, *addr)
+	apiHandler.Scans = scans
+
+	mux := http.NewServeMux()
+	apiHandler.Register(mux)
+	webHandler.Register(mux)
+
+	fmt.Fprintf(a.Stdout, "Nuqs web UI at http://%s\n", *addr)
+	listen := a.ListenAndServe
+	if listen == nil {
+		listen = defaultListenAndServe
+	}
+	if err := listen(ctx, *addr, api.LocalOnly(*addr, mux)); err != nil {
+		fmt.Fprintf(a.Stderr, "error: server terminated: %v\n", err)
+		return ExitError
+	}
+	return ExitOK
+}
+
+// checkLoopback makes sure the web UI only listens on this computer. There's
+// no login yet, so anyone who could reach it could run scans.
+func checkLoopback(addr string) error {
+	host, port, err := net.SplitHostPort(addr)
+	if err == nil {
+		_, err = strconv.ParseUint(port, 10, 16)
+	}
+	if err != nil {
+		return fmt.Errorf("--addr %q should look like 127.0.0.1:9002", addr)
+	}
+	if ip, perr := netip.ParseAddr(host); host != "localhost" && (perr != nil || !ip.IsLoopback()) {
+		return fmt.Errorf("--addr %q: the web UI only listens on this computer for now (127.0.0.1 or localhost), because it has no login yet", addr)
+	}
+	return nil
+}
+
+func defaultListenAndServe(ctx context.Context, addr string, h http.Handler) error {
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           h,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+	errCh := make(chan error, 1)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		}
+		close(errCh)
+	}()
+	select {
+	case err := <-errCh:
+		return err
+	case <-ctx.Done():
+		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(shutCtx)
+		return nil
+	}
 }
 
 // progress prints short status lines to stderr, so stdout stays clean for the report.
