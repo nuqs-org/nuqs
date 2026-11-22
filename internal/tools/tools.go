@@ -191,7 +191,7 @@ func (s *Service) ValidateScan(req ScanRequest) (ValidatedScan, error) {
 	if err != nil {
 		if errors.Is(err, target.ErrTooMany) {
 			return ValidatedScan{}, &ValidationError{
-				Message: fmt.Sprintf("That target covers more than %d addresses. Turn on \"Allow large networks\" in Scan options to scan it anyway.", target.DefaultLimit),
+				Message: fmt.Sprintf("That target covers more than %d addresses. Confirm the big scan under the target to scan it anyway.", target.DefaultLimit),
 			}
 		}
 		return ValidatedScan{}, &ValidationError{

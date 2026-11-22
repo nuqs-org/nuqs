@@ -5,7 +5,7 @@
   <div class="pageHead">
     <h1>{{.Name}}</h1>
     {{if .Description}}<p>{{.Description}}</p>{{end}}
-    <p class="bigStatus"><span class="statusPill {{.Status}}" id="statusLabel">{{.Label}}</span></p>
+    <p class="bigStatus"><span class="statusPill {{.Class}}" id="statusLabel">{{.Label}}</span></p>
   </div>
 
   {{if eq .Status "running"}}

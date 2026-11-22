@@ -10,9 +10,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"os/exec"
+	"strconv"
 	"time"
 
 	"github.com/nuqs-org/nuqs/internal/api"
@@ -204,6 +207,10 @@ func (a *App) serve(ctx context.Context, args []string) int {
 		return ExitUsage
 	}
 
+	if err := checkLoopback(*addr); err != nil {
+		fmt.Fprintln(a.Stderr, "error:", err)
+		return ExitUsage
+	}
 	allowed, err := tools.ParseAllowedScope(*allowRaw)
 	if err != nil {
 		fmt.Fprintln(a.Stderr, "error:", err)
@@ -235,7 +242,11 @@ func (a *App) serve(ctx context.Context, args []string) int {
 		StartedAt:    time.Now(),
 	}
 	scans := &tools.Scans{Service: svc}
-	defer scans.StopAll() // don't leave Nmap running after the server stops
+	// On Ctrl+C stop running scans first. Their live pages then get a last
+	// update and close, so the server can shut down right away.
+	stop := context.AfterFunc(ctx, scans.StopAll)
+	defer stop()
+	defer scans.StopAll()
 	webHandler, err := web.New(svc, scans, *addr)
 	if err != nil {
 		fmt.Fprintf(a.Stderr, "error: %v\n", err)
@@ -258,6 +269,22 @@ func (a *App) serve(ctx context.Context, args []string) int {
 		return ExitError
 	}
 	return ExitOK
+}
+
+// checkLoopback makes sure the web UI only listens on this computer. There's
+// no login yet, so anyone who could reach it could run scans.
+func checkLoopback(addr string) error {
+	host, port, err := net.SplitHostPort(addr)
+	if err == nil {
+		_, err = strconv.ParseUint(port, 10, 16)
+	}
+	if err != nil {
+		return fmt.Errorf("--addr %q should look like 127.0.0.1:9002", addr)
+	}
+	if ip, perr := netip.ParseAddr(host); host != "localhost" && (perr != nil || !ip.IsLoopback()) {
+		return fmt.Errorf("--addr %q: the web UI only listens on this computer for now (127.0.0.1 or localhost), because it has no login yet", addr)
+	}
+	return nil
 }
 
 func defaultListenAndServe(ctx context.Context, addr string, h http.Handler) error {

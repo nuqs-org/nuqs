@@ -97,17 +97,30 @@ func TestStartListGetDownload(t *testing.T) {
 
 func TestStartRejects(t *testing.T) {
 	h := newScansHandler(t, &slowRunner{release: make(chan struct{})})
+	const local = "http://127.0.0.1:9002"
+	const jsonType = "application/json"
+	scan := func(settings string) string { return `{"kind":"full","settings":` + settings + `}` }
 	for _, c := range []struct {
-		name, origin, media, body string
-		want                      int
+		name, host, origin, media, body string
+		want                            int
 	}{
-		{"foreign origin", "https://example.org", "application/json", `{"kind":"full","settings":{"target":"127.0.0.1"}}`, http.StatusForbidden},
-		{"not json", "http://127.0.0.1:9002", "text/plain", `{}`, http.StatusUnsupportedMediaType},
-		{"unknown field", "http://127.0.0.1:9002", "application/json", `{"kind":"full","nmap_path":"x"}`, http.StatusBadRequest},
-		{"outside scope", "http://127.0.0.1:9002", "application/json", `{"kind":"full","settings":{"target":"192.0.2.1"}}`, http.StatusBadRequest},
+		{"foreign origin", "127.0.0.1:9002", "https://example.org", jsonType, scan(`{"target":"127.0.0.1"}`), http.StatusForbidden},
+		{"localhost origin on the IP host", "127.0.0.1:9002", "http://localhost:9002", jsonType, scan(`{"target":"127.0.0.1"}`), http.StatusForbidden},
+		{"foreign host", "example.org:9002", local, jsonType, scan(`{"target":"127.0.0.1"}`), http.StatusForbidden},
+		{"not json", "127.0.0.1:9002", local, "text/plain", `{}`, http.StatusUnsupportedMediaType},
+		{"unknown field", "127.0.0.1:9002", local, jsonType, `{"kind":"full","nmap_path":"x"}`, http.StatusBadRequest},
+		{"two documents", "127.0.0.1:9002", local, jsonType, scan(`{"target":"127.0.0.1"}`) + `{}`, http.StatusBadRequest},
+		{"outside scope", "127.0.0.1:9002", local, jsonType, scan(`{"target":"192.0.2.1"}`), http.StatusBadRequest},
+		{"too wide", "127.0.0.1:9002", local, jsonType, scan(`{"target":"127.0.0.1/7","force":true}`), http.StatusBadRequest},
+		{"blank target", "127.0.0.1:9002", local, jsonType, scan(`{"target":" "}`), http.StatusBadRequest},
+		{"bad timeout", "127.0.0.1:9002", local, jsonType, scan(`{"target":"127.0.0.1","timeout":"later"}`), http.StatusBadRequest},
+		{"negative timeout", "127.0.0.1:9002", local, jsonType, scan(`{"target":"127.0.0.1","timeout":"-5s"}`), http.StatusBadRequest},
+		{"too many workers", "127.0.0.1:9002", local, jsonType, scan(`{"target":"127.0.0.1","workers":200}`), http.StatusBadRequest},
+		{"ports as a flag", "127.0.0.1:9002", local, jsonType, scan(`{"target":"127.0.0.1","ports":"-oN"}`), http.StatusBadRequest},
+		{"no kind", "127.0.0.1:9002", local, jsonType, `{"settings":{"target":"127.0.0.1"}}`, http.StatusBadRequest},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			r := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:9002/api/scans", strings.NewReader(c.body))
+			r := httptest.NewRequest(http.MethodPost, "http://"+c.host+"/api/scans", strings.NewReader(c.body))
 			r.Header.Set("Origin", c.origin)
 			r.Header.Set("Content-Type", c.media)
 			w := httptest.NewRecorder()

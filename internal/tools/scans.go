@@ -188,11 +188,11 @@ func (m *Scans) run(ctx context.Context, e *entry, valid ValidatedScan) {
 			s.Status = ScanStopped
 		case rep == nil:
 			s.Status = ScanFailed
-			s.Error = friendlyError(err)
+			s.Error = FriendlyError(err)
 		default:
 			s.Status = ScanCompleted
 			if err != nil {
-				s.Error = err.Error()
+				s.Error = FriendlyError(err)
 			}
 		}
 	})
@@ -266,19 +266,4 @@ func plural(n int, one, many string) string {
 		return "1 " + one
 	}
 	return strconv.Itoa(n) + " " + many
-}
-
-// friendlyError turns the errors people hit most into something they can act on.
-func friendlyError(err error) string {
-	if err == nil {
-		return "The scan couldn't run."
-	}
-	msg := err.Error()
-	switch {
-	case strings.Contains(msg, "executable file not found"), strings.Contains(msg, "no such file or directory"):
-		return "Nmap isn't installed or can't be found. Install it (brew install nmap or sudo apt install nmap) and start Nuqs again."
-	case strings.Contains(msg, "requires root"), strings.Contains(msg, "permission denied"):
-		return "Nmap wasn't allowed to run: " + msg
-	}
-	return msg
 }

@@ -122,7 +122,7 @@ func TestScanFailsWithFriendlyError(t *testing.T) {
 		t.Fatal(err)
 	}
 	failed := waitFor(t, m, s.ID, finished)
-	if failed.Status != ScanFailed || !strings.Contains(failed.Error, "brew install nmap") {
+	if failed.Status != ScanFailed || !strings.Contains(failed.Error, "Nmap isn't installed") {
 		t.Errorf("failed scan %+v", failed)
 	}
 }
@@ -161,18 +161,5 @@ func TestOldScansAreForgotten(t *testing.T) {
 	list := m.List()
 	if len(list) != 3 || list[0].ID != "5" || list[2].ID != "3" {
 		t.Errorf("want the 3 newest, got %d starting at %s", len(list), list[0].ID)
-	}
-}
-
-func TestFriendlyError(t *testing.T) {
-	for in, want := range map[error]string{
-		nil: "The scan couldn't run.",
-		errors.New("fork/exec /x: no such file or directory"): "Nmap isn't installed",
-		errors.New("nmap failed: requires root"):              "Nmap wasn't allowed to run",
-		errors.New("something else"):                          "something else",
-	} {
-		if got := friendlyError(in); !strings.HasPrefix(got, want) {
-			t.Errorf("friendlyError(%v) = %q, want it to start with %q", in, got, want)
-		}
 	}
 }

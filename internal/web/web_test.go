@@ -195,7 +195,7 @@ func TestCompletedScanPages(t *testing.T) {
 	s := startAndWait(t, h, "Lab box")
 
 	_, body := get(t, h, "/scans")
-	mustContain(t, "scans list", body, `href="/scans/`+s.ID+`"`, "Lab box", "Full scan", "Finished with errors in", "1 medium")
+	mustContain(t, "scans list", body, `href="/scans/`+s.ID+`"`, "Lab box", "Full scan", "Finished with errors in", "1 medium", `statusPill partial`)
 	if strings.Contains(body, "data-watch") {
 		t.Error("nothing is running, the list shouldn't watch")
 	}
@@ -267,7 +267,7 @@ func TestRunningAndFailedScan(t *testing.T) {
 	h2 := newTestWeb(t, &fakeRunner{err: errors.New(`exec: "nmap": executable file not found in $PATH`)})
 	failed := startAndWait(t, h2, "")
 	_, body = get(t, h2, "/scans/"+failed.ID)
-	mustContain(t, "failed scan", body, "The scan couldn", "brew install nmap", "Failed")
+	mustContain(t, "failed scan", body, "The scan couldn", "Nmap isn&#39;t installed", "Failed")
 }
 
 func TestHelpers(t *testing.T) {
@@ -283,7 +283,7 @@ func TestHelpers(t *testing.T) {
 		t.Errorf("donut %q", got)
 	}
 	if suggestedTarget([]netip.Prefix{netip.MustParsePrefix("10.0.0.5/32")}) != "10.0.0.5" ||
-		suggestedTarget([]netip.Prefix{netip.MustParsePrefix("10.0.0.0/24")}) != "10.0.0.0/24" {
+		suggestedTarget([]netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}) != "10.0.0.1" {
 		t.Error("suggestedTarget")
 	}
 	var c sevCounts

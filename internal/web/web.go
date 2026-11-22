@@ -146,6 +146,7 @@ func writeHTML(w http.ResponseWriter, body []byte) {
 type scanRow struct {
 	tools.Scan
 	Label  string // "Finished in 0.2s", "Scanning", "Stopped" and so on
+	Class  string // CSS class for the status dot
 	Counts sevCounts
 }
 
@@ -161,7 +162,7 @@ func (h *Handler) scansPage(w http.ResponseWriter, _ *http.Request) {
 		if s.Status == tools.ScanRunning {
 			data.Running = s.ID
 		}
-		data.Rows = append(data.Rows, scanRow{Scan: s, Label: statusLabel(s), Counts: countOf(s.Report)})
+		data.Rows = append(data.Rows, scanRow{Scan: s, Label: statusLabel(s), Class: statusClass(s), Counts: countOf(s.Report)})
 	}
 	h.render(w, "scans.html", page{Title: "Scans", Nav: "scans", Crumbs: []crumb{{Label: "Scans"}}, Data: data})
 }
@@ -289,6 +290,7 @@ type scanData struct {
 	tools.Scan
 	Tab     string // "hosts" or "vulns"
 	Label   string
+	Class   string
 	Counts  sevCounts
 	Donut   template.CSS
 	Hosts   []hostRow
@@ -303,7 +305,7 @@ func (h *Handler) scanPage(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	data := scanData{Scan: s, Tab: "hosts", Label: statusLabel(s), Counts: countOf(s.Report)}
+	data := scanData{Scan: s, Tab: "hosts", Label: statusLabel(s), Class: statusClass(s), Counts: countOf(s.Report)}
 	if r.URL.Query().Get("tab") == "vulns" {
 		data.Tab = "vulns"
 	}
@@ -412,6 +414,15 @@ func statusLabel(s tools.Scan) string {
 		return "Finished with errors in " + took
 	}
 	return "Finished in " + took
+}
+
+// statusClass picks the status dot colour: amber when a scan finished but
+// some checks couldn't, so it doesn't look as clean as a full run.
+func statusClass(s tools.Scan) string {
+	if s.Status == tools.ScanCompleted && (s.Error != "" || (s.Report != nil && len(s.Report.Errors) > 0)) {
+		return "partial"
+	}
+	return string(s.Status)
 }
 
 // --- One host ---
@@ -542,6 +553,8 @@ func formatDuration(seconds float64) string {
 	return fmt.Sprintf("%.1fs", seconds)
 }
 
+// suggestedTarget is one address the user may scan, for placeholders and the
+// "Scan this" button. A single host keeps that first scan quick.
 func suggestedTarget(allowed []netip.Prefix) string {
 	if tools.TargetAllowed("127.0.0.1", allowed) {
 		return "127.0.0.1"
@@ -550,7 +563,7 @@ func suggestedTarget(allowed []netip.Prefix) string {
 	if p.Bits() == p.Addr().BitLen() {
 		return p.Addr().String()
 	}
-	return p.String()
+	return p.Masked().Addr().Next().String() // like 192.168.1.1 for 192.168.1.0/24
 }
 
 // interfaceAddrs lists this machine's addresses. Tests swap it out.

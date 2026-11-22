@@ -66,6 +66,18 @@ If a check couldn't finish (timeout, connection reset and so on), it's listed un
 | 1 | Scan couldn't run, or was stopped |
 | 2 | The command was typed wrong |
 
+## Web UI
+
+```bash
+./nuqs serve
+```
+
+Then open http://127.0.0.1:9002. Pick **New scan**, choose a scan type, enter a target and press **Launch**. Results show by host and by vulnerability, and you can follow a running scan live.
+
+- It only listens on this computer, because it has no login yet.
+- By default it only scans this computer (`127.0.0.0/8`). To scan your network too, start it with `./nuqs serve --allow 192.168.1.0/24`.
+- One scan runs at a time. The last 50 are kept until you stop the server.
+
 ## Other commands
 
 ```bash

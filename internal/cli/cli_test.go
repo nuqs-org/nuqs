@@ -270,6 +270,11 @@ func TestServeCommand(t *testing.T) {
 			{"serve", "--nope"},
 			{"serve", "extra"},
 			{"serve", "--allow", "not-a-cidr"},
+			{"serve", "--addr", "0.0.0.0:9002"},
+			{"serve", "--addr", ":9002"},
+			{"serve", "--addr", "192.168.1.5:9002"},
+			{"serve", "--addr", "127.0.0.1"},
+			{"serve", "--addr", "127.0.0.1:99999"},
 		}
 		for _, args := range cases {
 			app, _, _ := newApp(t, &fakeRunner{})
@@ -294,4 +299,12 @@ func TestServeCommand(t *testing.T) {
 			t.Fatalf("listen error: code=%d stderr=%s", code, errOut2)
 		}
 	})
+}
+
+func TestCheckLoopback(t *testing.T) {
+	for _, ok := range []string{"127.0.0.1:9002", "127.5.5.5:80", "localhost:9002", "[::1]:9002"} {
+		if err := checkLoopback(ok); err != nil {
+			t.Errorf("%s should be allowed: %v", ok, err)
+		}
+	}
 }
