@@ -126,8 +126,8 @@ table.list {width:100%;border-collapse:collapse}
 .progressCard {grid-template-columns:auto 1fr;align-items:center;gap:16px}
 .phase {font-weight:600}
 .progressNumbers {color:var(--sub);font-size:13px}
-.progressBar {height:5px;border-radius:3px;background:var(--rule);overflow:hidden;margin-top:8px}
-.progressBar i {display:block;height:100%;background:var(--accent);transition:width .3s}
+.progressBar {height:6px;border-radius:3px;background:var(--rule);overflow:hidden;margin:8px 0 6px}
+.progressBar i {display:block;height:100%;background:var(--accent);transition:width .8s ease-out}
 .spinner {width:22px;height:22px;border-radius:50%;border:2.5px solid var(--rule);border-top-color:var(--accent);animation:spin .8s linear infinite}
 @keyframes spin {to {transform:rotate(360deg)}}
 .errorCard {border-left:3px solid var(--critical)}

@@ -8,7 +8,7 @@ targets ──► target.Parse ──► Nmap ──► hosts + services ──�
 ```
 
 1. **Validate targets.** We reject anything that isn't an IP, network, range or hostname. This also stops tricks like passing `-oN file` as a target.
-2. **Find hosts with Nmap.** We run `nmap -sT -sV --open` and read its XML while it runs. Nmap writes each host when it's done with it, plus a progress update every 5 seconds, so we get those as they happen instead of at the end. Nmap does all the low-level packet work.
+2. **Find hosts with Nmap.** We run `nmap -sT -sV --open` and read its XML while it runs. Nmap writes each host when it's done with it, plus a progress update every 2 seconds, so we get those as they happen instead of at the end. The CLI and the web UI turn those updates into one steady percent and time left (see `internal/progress`). Nmap does all the low-level packet work.
 3. **Pick checks.** Each check says which services it cares about (by port or Nmap service name). We only run a check where it applies.
 4. **Run checks in parallel.** Each check gets its own timeout. If a check errors, hangs or even panics, it's recorded and the scan keeps going.
 5. **Report.** Findings are sorted worst first, with evidence and a fix.

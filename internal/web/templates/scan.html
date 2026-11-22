@@ -9,12 +9,12 @@
   </div>
 
   {{if eq .Status "running"}}
-  <div class="card progressCard" aria-live="polite">
+  <div class="card progressCard">
     <div class="spinner" aria-hidden="true"></div>
     <div>
-      <p class="phase" id="phase">{{.Phase}}</p>
-      <p class="progressNumbers"><span id="checksLine">{{if .ChecksTotal}}{{.ChecksDone}} of {{.ChecksTotal}} checks done{{end}}</span> <span id="elapsed" class="mono"></span></p>
-      <div class="progressBar"><i id="progressFill" style="width:0%"></i></div>
+      <p class="phase" id="phase" aria-live="polite">{{.Phase}}</p>
+      <div class="progressBar" role="progressbar" aria-label="Scan progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{whole .Percent}}" id="progressBar"><i id="progressFill" style="width:{{whole .Percent}}%"></i></div>
+      <p class="progressNumbers"><span id="percentText">{{whole .Percent}}%</span> · <span id="remaining">{{if .Remaining}}{{.Remaining}}{{else}}working out the time left{{end}}</span> · <span id="elapsed" class="mono">{{duration .Elapsed.Seconds}}</span> so far</p>
     </div>
   </div>
   {{else if eq .Status "failed"}}

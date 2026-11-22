@@ -23,13 +23,20 @@ func main() {
 	defer stop()
 
 	app := &cli.App{
-		Version:   version,
-		Stdout:    os.Stdout,
-		Stderr:    os.Stderr,
-		NewRunner: func(path string) nmap.Runner { return nmap.ExecRunner{Path: path} },
-		Checks:    checks.All,
+		Version:      version,
+		Stdout:       os.Stdout,
+		Stderr:       os.Stderr,
+		NewRunner:    func(path string) nmap.Runner { return nmap.ExecRunner{Path: path} },
+		Checks:       checks.All,
+		LiveProgress: isTerminal(os.Stderr) && os.Getenv("TERM") != "dumb",
 	}
 	code := app.Run(ctx, os.Args[1:])
 	stop()
 	os.Exit(code)
+}
+
+// isTerminal reports whether f is a terminal, not a file or a pipe.
+func isTerminal(f *os.File) bool {
+	info, err := f.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/nuqs-org/nuqs/internal/engine"
+	"github.com/nuqs-org/nuqs/internal/progress"
 )
 
 // ScanStatus is where a scan is in its life.
@@ -49,7 +50,9 @@ type Scan struct {
 	Settings    ScanRequest    `json:"settings"`
 	Targets     []string       `json:"targets"`
 	Status      ScanStatus     `json:"status"`
-	Phase       string         `json:"phase,omitempty"` // what it's doing right now, in plain words
+	Phase       string         `json:"phase,omitempty"`     // what it's doing right now, in plain words
+	Percent     float64        `json:"percent"`             // how far the whole scan is, 0 to 100, never goes down
+	Remaining   string         `json:"remaining,omitempty"` // time left in plain words, like "about 40s left"
 	HostsFound  int            `json:"hosts_found"`
 	ChecksDone  int            `json:"checks_done"`
 	ChecksTotal int            `json:"checks_total"`
@@ -93,8 +96,22 @@ type Scans struct {
 
 type entry struct {
 	scan    Scan
+	tracker *progress.Tracker // the same estimate the CLI shows
 	cancel  context.CancelFunc
 	changed chan struct{} // closed and replaced on every change, so watchers wake up
+}
+
+// snapshot copies the scan with its progress worked out for now, since the
+// time left counts down between updates. Callers hold m.mu.
+func (e *entry) snapshot() Scan {
+	s := e.scan
+	if s.Status == ScanRunning {
+		now := time.Now()
+		s.Percent = e.tracker.Percent()
+		s.Phase = e.tracker.Step()
+		s.Remaining = e.tracker.Remaining(now)
+	}
+	return s
 }
 
 // Start checks the settings and starts the scan in the background.
@@ -134,16 +151,17 @@ func (m *Scans) Start(in NewScan) (Scan, error) {
 			Settings:    in.Settings,
 			Targets:     valid.Targets,
 			Status:      ScanRunning,
-			Phase:       "Starting",
+			Phase:       "Starting Nmap",
 			Started:     time.Now(),
 		},
 		cancel:  cancel,
 		changed: make(chan struct{}),
 	}
+	e.tracker = progress.New(e.scan.Started)
 	m.list = append([]*entry{e}, m.list...)
 	m.trim()
 	go m.run(ctx, e, valid)
-	return e.scan, nil
+	return e.snapshot(), nil
 }
 
 // trim forgets the oldest finished scans past Keep. Callers hold m.mu.
@@ -163,26 +181,24 @@ func (m *Scans) run(ctx context.Context, e *entry, valid ValidatedScan) {
 	defer e.cancel()
 	rep, err := m.Service.RunValidated(ctx, valid, func(ev engine.Event) {
 		m.update(e, func(s *Scan) {
+			e.tracker.Add(ev, time.Now())
 			switch ev.Kind {
-			case engine.DiscoveryStarted:
-				s.Phase = "Finding hosts and open ports"
 			case engine.DiscoveryDone:
 				s.HostsFound = ev.Count
-				s.Phase = "Found " + plural(ev.Count, "live host", "live hosts")
 			case engine.ChecksStarted:
 				s.ChecksTotal = ev.Count
-				s.Phase = "Running " + plural(ev.Count, "check", "checks")
 			case engine.CheckDone:
 				s.ChecksDone++
-			case engine.ScanDone:
-				s.Phase = "Writing the report"
 			}
 		})
 	})
 	m.update(e, func(s *Scan) {
 		s.Finished = time.Now()
 		s.Report = rep
-		s.Phase = ""
+		s.Phase, s.Remaining = "", ""
+		if rep != nil {
+			s.Percent = 100
+		}
 		switch {
 		case ctx.Err() != nil:
 			s.Status = ScanStopped
@@ -213,7 +229,7 @@ func (m *Scans) List() []Scan {
 	defer m.mu.Unlock()
 	out := make([]Scan, len(m.list))
 	for i, e := range m.list {
-		out[i] = e.scan
+		out[i] = e.snapshot()
 	}
 	return out
 }
@@ -231,7 +247,7 @@ func (m *Scans) Watch(id string) (Scan, <-chan struct{}, bool) {
 	defer m.mu.Unlock()
 	for _, e := range m.list {
 		if e.scan.ID == id {
-			return e.scan, e.changed, true
+			return e.snapshot(), e.changed, true
 		}
 	}
 	return Scan{}, nil, false
@@ -259,11 +275,4 @@ func (m *Scans) StopAll() {
 	for _, e := range m.list {
 		e.cancel()
 	}
-}
-
-func plural(n int, one, many string) string {
-	if n == 1 {
-		return "1 " + one
-	}
-	return strconv.Itoa(n) + " " + many
 }

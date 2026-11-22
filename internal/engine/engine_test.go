@@ -257,6 +257,50 @@ func TestEvents(t *testing.T) {
 	}
 }
 
+// progressScanner is a fakeScanner that also reports progress.
+type progressScanner struct {
+	fakeScanner
+	updates []ScannerProgress
+}
+
+func (p progressScanner) ScanWithProgress(_ context.Context, _ []string, progress func(ScannerProgress)) ([]model.Host, error) {
+	for _, u := range p.updates {
+		progress(u)
+	}
+	return p.hosts, p.err
+}
+
+func TestScannerProgressIsPassedOn(t *testing.T) {
+	updates := []ScannerProgress{{Task: "Connect Scan", Percent: 40, Remaining: 3 * time.Second}, {Task: "Service scan", Percent: 90}}
+	var got []Event
+	e := &Engine{
+		Scanner: progressScanner{fakeScanner: fakeScanner{hosts: twoHosts}, updates: updates},
+		Checks:  []check.Check{newCheck("all", model.Low, nil, clean)},
+		OnEvent: func(ev Event) { got = append(got, ev) },
+	}
+	if _, err := e.Run(context.Background(), nil); err != nil {
+		t.Fatal(err)
+	}
+	if got[0].Kind != DiscoveryStarted || got[1].Kind != ScanProgress || got[2].Kind != ScanProgress || got[3].Kind != DiscoveryDone {
+		t.Fatalf("progress should come between discovery start and done: %v", got[:4])
+	}
+	if got[1].Progress != updates[0] || got[2].Progress != updates[1] {
+		t.Errorf("progress changed on the way: %+v %+v", got[1].Progress, got[2].Progress)
+	}
+
+	// Without OnEvent nobody's listening, so the plain Scan is used.
+	e.OnEvent = nil
+	if rep, err := e.Run(context.Background(), nil); err != nil || len(rep.Hosts) != 2 {
+		t.Errorf("without OnEvent: %v %v", rep, err)
+	}
+	// A failing scan with progress still fails cleanly.
+	e.Scanner = progressScanner{fakeScanner: fakeScanner{err: errors.New("boom")}}
+	e.OnEvent = func(Event) {}
+	if _, err := e.Run(context.Background(), nil); err == nil || !strings.Contains(err.Error(), "boom") {
+		t.Errorf("want the scanner's error, got %v", err)
+	}
+}
+
 func TestSetupErrors(t *testing.T) {
 	if _, err := (&Engine{}).Run(context.Background(), nil); err == nil {
 		t.Error("missing scanner should fail")

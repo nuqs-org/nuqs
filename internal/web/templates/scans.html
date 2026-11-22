@@ -11,7 +11,7 @@
       {{range .Rows}}<tr class="rowLink">
         <td><a href="/scans/{{.ID}}"><strong>{{.Name}}</strong></a><small>{{join .Targets ", "}}</small></td>
         <td>{{.KindName}}</td>
-        <td><span class="statusPill {{.Class}}">{{.Label}}</span></td>
+        <td><span class="statusPill {{.Class}}"{{if eq .Status "running"}} id="statusLabel"{{end}}>{{.Label}}</span></td>
         <td>{{if eq .Status "running"}}<span class="none">—</span>{{else}}{{template "counts" .Counts}}{{end}}</td>
         <td class="mono">{{clock .Started}}</td>
       </tr>{{end}}

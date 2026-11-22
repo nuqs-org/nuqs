@@ -285,17 +285,26 @@ if (watched) {
       location.reload();
       return;
     }
+    // The server works out percent and time left the same way the CLI does,
+    // the page only shows them.
+    const percent = Math.floor(p.percent) + "%";
     const set = (elementId, text) => { if (byId(elementId)) byId(elementId).textContent = text; };
+    set("statusLabel", "Scanning · " + percent);
     set("phase", p.phase || "Working");
-    set("elapsed", p.seconds.toFixed(1) + "s");
-    set("statusLabel", "Scanning · " + p.seconds.toFixed(1) + "s");
-    if (p.checks_total) set("checksLine", p.checks_done + " of " + p.checks_total + " checks done ·");
+    set("percentText", percent);
+    set("remaining", p.remaining || "working out the time left");
+    set("elapsed", elapsed(p.seconds));
     if (byId("progressFill")) {
-      // Finding hosts is the first half, checks the second.
-      const part = p.checks_total ? 0.5 + 0.5 * p.checks_done / p.checks_total : (p.hosts_found ? 0.5 : 0.15);
-      byId("progressFill").style.width = Math.round(part * 100) + "%";
+      byId("progressFill").style.width = p.percent + "%";
+      byId("progressBar").setAttribute("aria-valuenow", String(Math.floor(p.percent)));
     }
   };
+}
+
+// elapsed matches the server's duration format: 0.2s, 12.3s, 1m 5s.
+function elapsed(seconds) {
+  if (seconds >= 60) return Math.floor(seconds / 60) + "m " + Math.floor(seconds % 60) + "s";
+  return seconds > 0 && seconds < 0.1 ? seconds.toFixed(2) + "s" : seconds.toFixed(1) + "s";
 }
 
 const stop = byId("stopScan");

@@ -43,7 +43,7 @@ func Args(targets []string, opt Options) []string {
 		"-sV",                 // detect service names and versions
 		"--open",              // only report open ports
 		"-T4",                 // sensible speed for normal networks
-		"--stats-every", "5s", // a progress update in the XML every 5 seconds
+		"--stats-every", "2s", // a progress update in the XML every 2 seconds
 		"-oX", "-", // XML to stdout
 	}
 	if opt.LightVersion {

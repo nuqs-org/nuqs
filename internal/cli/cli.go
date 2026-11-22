@@ -48,6 +48,10 @@ type App struct {
 	LookPath func(file string) (string, error)
 	// ListenAndServe starts the HTTP server for "nuqs serve". Nil defaults to net/http.
 	ListenAndServe func(ctx context.Context, addr string, h http.Handler) error
+	// LiveProgress shows scan progress as one line that updates in place.
+	// Set it when Stderr is a terminal. Otherwise progress is a few plain
+	// lines, which read fine in logs and CI.
+	LiveProgress bool
 }
 
 const usage = `Nuqs is a non-overengineered vulnerability assessment tool.
@@ -150,13 +154,27 @@ func (a *App) scan(ctx context.Context, args []string) int {
 		NewRunner: func() nmap.Runner { return a.NewRunner(*nmapPath) },
 		Checks:    a.Checks,
 	}
+	onEvent := a.progress
+	var live *liveStatus
+	started := time.Now()
+	if a.LiveProgress {
+		live = newLiveStatus(a.Stderr, time.Now)
+		go live.tick(time.Second)
+		onEvent = live.event
+	}
 	rep, err := svc.RunValidated(ctx, tools.ValidatedScan{
 		Targets:  targets,
 		Ports:    *ports,
 		SkipPing: *skipPing,
 		Workers:  *workers,
 		Timeout:  *timeout,
-	}, a.progress)
+	}, onEvent)
+	if live != nil {
+		live.finish()
+		if rep != nil {
+			fmt.Fprintf(a.Stderr, "Scanned in %s.\n\n", time.Since(started).Round(100*time.Millisecond))
+		}
+	}
 	if rep == nil {
 		fmt.Fprintln(a.Stderr, "error:", err)
 		return ExitError

@@ -57,6 +57,7 @@ func New(svc *tools.Service, scans *tools.Scans, addr string) (*Handler, error) 
 		"duration":   formatDuration,
 		"clock":      func(t time.Time) string { return t.Local().Format("Jan 2, 15:04:05") },
 		"lower":      strings.ToLower,
+		"whole":      func(f float64) int { return int(f) },
 	}
 	base, err := template.New("").Funcs(funcs).ParseFS(assets, "templates/layout.html", "templates/parts.html", "templates/checks_library.html")
 	if err != nil {
@@ -404,7 +405,7 @@ func statusLabel(s tools.Scan) string {
 	took := formatDuration(s.Elapsed().Seconds())
 	switch s.Status {
 	case tools.ScanRunning:
-		return "Scanning"
+		return fmt.Sprintf("Scanning · %d%%", int(s.Percent))
 	case tools.ScanStopped:
 		return "Stopped after " + took
 	case tools.ScanFailed:

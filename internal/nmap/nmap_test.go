@@ -20,7 +20,7 @@ import (
 
 func TestArgs(t *testing.T) {
 	got := Args([]string{"10.0.0.1", "example.com"}, Options{})
-	want := []string{"-sT", "-sV", "--open", "-T4", "--stats-every", "5s", "-oX", "-", "--", "10.0.0.1", "example.com"}
+	want := []string{"-sT", "-sV", "--open", "-T4", "--stats-every", "2s", "-oX", "-", "--", "10.0.0.1", "example.com"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Args = %q\nwant  %q", got, want)
 	}

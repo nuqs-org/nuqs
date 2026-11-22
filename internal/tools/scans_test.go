@@ -65,11 +65,52 @@ func TestScanRunsInBackground(t *testing.T) {
 	if done.Status != ScanCompleted || done.Report == nil || len(done.Report.Findings) != 1 {
 		t.Fatalf("finished scan %+v", done)
 	}
-	if done.HostsFound != 1 || done.ChecksTotal != 1 || done.ChecksDone != 1 || done.Phase != "" {
+	if done.HostsFound != 1 || done.ChecksTotal != 1 || done.ChecksDone != 1 || done.Phase != "" || done.Percent != 100 || done.Remaining != "" {
 		t.Errorf("progress not tracked: %+v", done)
 	}
 	if done.Elapsed() <= 0 || done.Elapsed() > 5*time.Second {
 		t.Errorf("elapsed %v", done.Elapsed())
+	}
+}
+
+// halfwayRunner prints a progress update, waits to be released, then prints the host.
+type halfwayRunner struct{ release chan struct{} }
+
+func (h *halfwayRunner) Run(ctx context.Context, _ []string, out io.Writer) error {
+	if _, err := io.WriteString(out, `<nmaprun><taskprogress task="Service scan" percent="50" remaining="10"/>`); err != nil {
+		return err
+	}
+	select {
+	case <-h.release:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	_, err := io.WriteString(out, strings.TrimPrefix(telnetXML, "<nmaprun>"))
+	return err
+}
+
+func TestProgressWhileRunning(t *testing.T) {
+	r := &halfwayRunner{release: make(chan struct{})}
+	m := &Scans{Service: newTestService(r)}
+	s, err := m.Start(NewScan{Kind: "full", Settings: ScanRequest{Target: "127.0.0.1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Phase != "Starting Nmap" || s.Percent != 0 {
+		t.Errorf("new scan %q %v", s.Phase, s.Percent)
+	}
+	mid := waitFor(t, m, s.ID, func(s Scan) bool { return s.Percent > 0 })
+	// Halfway through service detection is 85% * 77.5%, so about 66%.
+	if mid.Phase != "Identifying services" || mid.Percent < 65 || mid.Percent > 67 {
+		t.Errorf("halfway: %q %.1f", mid.Phase, mid.Percent)
+	}
+	if list := m.List(); list[0].Percent != mid.Percent {
+		t.Errorf("List should show the same progress, got %.1f", list[0].Percent)
+	}
+	close(r.release)
+	done := waitFor(t, m, s.ID, finished)
+	if done.Status != ScanCompleted || done.Percent != 100 {
+		t.Errorf("done %+v", done)
 	}
 }
 
@@ -83,7 +124,6 @@ func TestOneScanAtATimeAndStop(t *testing.T) {
 	if s.Name != "Office router" {
 		t.Errorf("name %q", s.Name)
 	}
-	waitFor(t, m, s.ID, func(s Scan) bool { return s.Phase == "Finding hosts and open ports" })
 
 	if _, err := m.Start(NewScan{Kind: "quick", Settings: ScanRequest{Target: "127.0.0.1"}}); !errors.Is(err, ErrBusy) {
 		t.Errorf("second scan should be refused while one runs, got %v", err)

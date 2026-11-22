@@ -25,6 +25,8 @@ type ScanSummary struct {
 type Progress struct {
 	Status      tools.ScanStatus `json:"status"`
 	Phase       string           `json:"phase,omitempty"`
+	Percent     float64          `json:"percent"`             // the whole scan, 0 to 100, never goes down
+	Remaining   string           `json:"remaining,omitempty"` // like "about 40s left"
 	HostsFound  int              `json:"hosts_found"`
 	ChecksDone  int              `json:"checks_done"`
 	ChecksTotal int              `json:"checks_total"`
@@ -168,6 +170,8 @@ func (h *Handler) scanEvents(w http.ResponseWriter, r *http.Request) {
 		data, _ := json.Marshal(Progress{
 			Status:      s.Status,
 			Phase:       s.Phase,
+			Percent:     s.Percent,
+			Remaining:   s.Remaining,
 			HostsFound:  s.HostsFound,
 			ChecksDone:  s.ChecksDone,
 			ChecksTotal: s.ChecksTotal,

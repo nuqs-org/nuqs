@@ -19,6 +19,7 @@ import (
 
 	"github.com/nuqs-org/nuqs/internal/check"
 	"github.com/nuqs-org/nuqs/internal/engine"
+	"github.com/nuqs-org/nuqs/internal/model"
 	"github.com/nuqs-org/nuqs/internal/nmap"
 	"github.com/nuqs-org/nuqs/internal/target"
 )
@@ -285,7 +286,7 @@ func (s *Service) RunValidated(ctx context.Context, scan ValidatedScan, onEvent 
 		runner = s.NewRunner()
 	}
 	eng := &engine.Engine{
-		Scanner: nmap.Scanner{
+		Scanner: nmapScanner{nmap.Scanner{
 			Runner: runner,
 			Options: nmap.Options{
 				Ports:        scan.Ports,
@@ -293,13 +294,31 @@ func (s *Service) RunValidated(ctx context.Context, scan ValidatedScan, onEvent 
 				LightVersion: scan.LightVersion,
 				SkipPing:     scan.SkipPing,
 			},
-		},
+		}},
 		Checks:       s.Checks(),
 		Workers:      scan.Workers,
 		CheckTimeout: scan.Timeout,
 		OnEvent:      onEvent,
 	}
 	return eng.Run(ctx, scan.Targets)
+}
+
+// nmapScanner lets the engine follow Nmap's own progress while it runs.
+type nmapScanner struct{ nmap.Scanner }
+
+// ScanWithProgress runs Nmap and passes each of its progress updates on.
+func (s nmapScanner) ScanWithProgress(ctx context.Context, targets []string, progress func(engine.ScannerProgress)) ([]model.Host, error) {
+	var hosts []model.Host
+	err := s.Stream(ctx, targets, nmap.Events{
+		Host: func(h model.Host) { hosts = append(hosts, h) },
+		Progress: func(p nmap.Progress) {
+			progress(engine.ScannerProgress{Task: p.Task, Percent: p.Percent, Remaining: p.Remaining})
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return hosts, nil
 }
 
 // NmapInstallHint returns an OS-appropriate instruction for installing Nmap.

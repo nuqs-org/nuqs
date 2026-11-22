@@ -201,7 +201,7 @@ func TestScanEventsStream(t *testing.T) {
 		}
 	}
 	last := got[len(got)-1]
-	if last.Status != tools.ScanCompleted || last.ChecksDone != 1 || last.HostsFound != 1 {
+	if last.Status != tools.ScanCompleted || last.ChecksDone != 1 || last.HostsFound != 1 || last.Percent != 100 {
 		t.Errorf("last update %+v", last)
 	}
 }
