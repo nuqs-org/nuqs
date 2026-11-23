@@ -348,3 +348,45 @@ func TestSaveAfterCloseFails(t *testing.T) {
 		t.Error("finish on a closed store should fail")
 	}
 }
+
+// Regression: a report that can't be written must not leave a finished run
+// behind without it. Save is one transaction.
+func TestSaveIsAllOrNothing(t *testing.T) {
+	s, _ := open(t)
+	// Make the findings insert fail halfway through the save.
+	if _, err := s.db.Exec(`CREATE TRIGGER no_findings BEFORE INSERT ON findings BEGIN SELECT RAISE(ABORT, 'disk full'); END`); err != nil {
+		t.Fatal(err)
+	}
+	r := Run{Name: "half", Kind: "cli", Targets: []string{"10.0.0.1"}, Status: Completed, Started: at, Report: sampleReport()}
+	if err := s.Save(&r); err == nil {
+		t.Fatal("save should fail")
+	}
+	runs, err := s.Runs(0)
+	if err != nil || len(runs) != 0 {
+		t.Errorf("a failed save left %d runs behind: %+v, %v", len(runs), runs, err)
+	}
+}
+
+// Regression: several Nuqs processes opening a new database at once must
+// not run the same migration twice ("table runs already exists").
+func TestParallelFirstOpens(t *testing.T) {
+	for round := range 20 {
+		dir := t.TempDir()
+		errs := make(chan error, 8)
+		for range 8 {
+			go func() {
+				s, err := Open(dir)
+				if err == nil {
+					_, err = s.Runs(0)
+					s.Close()
+				}
+				errs <- err
+			}()
+		}
+		for range 8 {
+			if err := <-errs; err != nil {
+				t.Fatalf("round %d: %v", round, err)
+			}
+		}
+	}
+}

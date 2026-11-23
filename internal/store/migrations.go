@@ -68,32 +68,45 @@ var migrations = []string{
 }
 
 // migrate runs the migrations this database hasn't had yet, each in its own
-// transaction, so a failed one leaves the database as it was.
+// transaction, so a failed one leaves the database as it was. The version is
+// read inside the transaction, which holds the write lock from its start
+// (_txlock=immediate in Open), so when several Nuqs processes open a new
+// database at once, one migrates and the others wait and then see it's done.
 func (s *Store) migrate() error {
-	var done int
-	if err := s.db.QueryRow(`PRAGMA user_version`).Scan(&done); err != nil {
-		return fmt.Errorf("read schema version: %w", err)
-	}
-	if done > len(migrations) {
-		return fmt.Errorf("the database is from a newer Nuqs (schema %d, this one knows %d), update Nuqs", done, len(migrations))
-	}
-	for i := done; i < len(migrations); i++ {
-		tx, err := s.db.Begin()
-		if err != nil {
+	for {
+		done, err := s.migrateOne()
+		if err != nil || done {
 			return err
 		}
-		_, err = tx.Exec(migrations[i])
-		if err == nil {
-			// PRAGMA can't take a ? parameter, i is our own number.
-			_, err = tx.Exec(fmt.Sprintf(`PRAGMA user_version = %d`, i+1))
-		}
-		if err == nil {
-			err = tx.Commit()
-		}
-		if err != nil {
-			_ = tx.Rollback()
-			return fmt.Errorf("schema step %d: %w", i+1, err)
-		}
 	}
-	return nil
+}
+
+// migrateOne runs the next migration, or reports that there's none left.
+func (s *Store) migrateOne() (bool, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return false, fmt.Errorf("read schema version: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }() // does nothing after Commit
+	var version int
+	if err := tx.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
+		return false, fmt.Errorf("read schema version: %w", err)
+	}
+	if version > len(migrations) {
+		return false, fmt.Errorf("the database is from a newer Nuqs (schema %d, this one knows %d), update Nuqs", version, len(migrations))
+	}
+	if version == len(migrations) {
+		return true, nil
+	}
+	if _, err := tx.Exec(migrations[version]); err != nil {
+		return false, fmt.Errorf("schema step %d: %w", version+1, err)
+	}
+	// PRAGMA can't take a ? parameter, the number is our own.
+	if _, err := tx.Exec(fmt.Sprintf(`PRAGMA user_version = %d`, version+1)); err != nil {
+		return false, fmt.Errorf("schema step %d: %w", version+1, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return false, fmt.Errorf("schema step %d: %w", version+1, err)
+	}
+	return false, nil
 }

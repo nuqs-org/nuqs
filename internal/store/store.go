@@ -19,7 +19,7 @@ import (
 
 	"github.com/nuqs-org/nuqs/internal/engine"
 	"github.com/nuqs-org/nuqs/internal/model"
-	_ "modernc.org/sqlite" // the SQLite driver, pure Go so Nuqs still builds without a C compiler
+	"modernc.org/sqlite" // the SQLite driver, pure Go so Nuqs still builds without a C compiler
 )
 
 // ErrNotFound is returned for a run ID that isn't saved.
@@ -96,9 +96,11 @@ func Open(dir string) (*Store, error) {
 	_ = os.Chmod(path, 0o600) // in case it was made before with looser permissions
 	// WAL lets the CLI and the server use the file at the same time, and
 	// busy_timeout makes one wait a bit for the other instead of failing.
+	// _txlock=immediate makes every transaction take the write lock when it
+	// starts, so two of them never read the same thing and then both write.
 	// The path is escaped because "?", "#" and "%" mean something in a
 	// SQLite file: URI, and a folder name can contain any of them.
-	uri := "file:" + uriEscaper.Replace(path) + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)"
+	uri := "file:" + uriEscaper.Replace(path) + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)&_txlock=immediate"
 	db, err := sql.Open("sqlite", uri)
 	if err != nil {
 		return nil, fmt.Errorf("open %s: %w", path, err)
@@ -107,7 +109,7 @@ func Open(dir string) (*Store, error) {
 	// pragmas above always apply and writes never trip over each other.
 	db.SetMaxOpenConns(1)
 	s := &Store{db: db}
-	if err := s.migrate(); err != nil {
+	if err := s.migrateWhenFree(); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("open %s: %w", path, err)
 	}
@@ -115,6 +117,23 @@ func Open(dir string) (*Store, error) {
 }
 
 var uriEscaper = strings.NewReplacer("%", "%25", "?", "%3F", "#", "%23")
+
+// migrateWhenFree runs the migrations, waiting if another Nuqs is busy with
+// the same new database. While one process turns on WAL mode, SQLite tells
+// the others "busy" right away instead of waiting, so we wait for it.
+func (s *Store) migrateWhenFree() error {
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		err := s.migrate()
+		var e *sqlite.Error
+		if err == nil || !errors.As(err, &e) || e.Code()&0xff != sqliteBusy || time.Now().After(deadline) {
+			return err
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+const sqliteBusy = 5 // SQLITE_BUSY, the low byte of the error code
 
 // Close closes the database.
 func (s *Store) Close() error { return s.db.Close() }
@@ -132,27 +151,31 @@ func (s *Store) CloseUnfinished() error {
 }
 
 // Save saves a run that's already done, report and all, and sets its ID.
+// It's one transaction: if any part fails, nothing is saved.
 func (s *Store) Save(r *Run) error {
-	if err := s.Create(r); err != nil {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("save scan: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }() // does nothing after Commit
+	if err := insertRun(tx, r); err != nil {
+		r.ID = 0
 		return err
 	}
-	return s.Finish(*r)
+	if err := finishRun(tx, *r); err != nil {
+		r.ID = 0
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		r.ID = 0
+		return fmt.Errorf("save scan: %w", err)
+	}
+	return nil
 }
 
 // Create saves a run that's starting and sets its ID. Call Finish when it's done.
 func (s *Store) Create(r *Run) error {
-	targets, err := json.Marshal(r.Targets)
-	if err != nil {
-		return err
-	}
-	res, err := s.db.Exec(`INSERT INTO runs (name, description, kind, settings, targets, status, error, started)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		r.Name, r.Description, r.Kind, orEmpty(r.Settings, "{}"), string(targets), orEmpty(r.Status, Running), r.Error, unix(r.Started))
-	if err != nil {
-		return fmt.Errorf("save scan: %w", err)
-	}
-	r.ID, err = res.LastInsertId()
-	return err
+	return insertRun(s.db, r)
 }
 
 // Finish saves how a run ended and everything it found, all at once.
@@ -162,7 +185,33 @@ func (s *Store) Finish(r Run) error {
 		return fmt.Errorf("save scan %d: %w", r.ID, err)
 	}
 	defer func() { _ = tx.Rollback() }() // does nothing after Commit
+	if err := finishRun(tx, r); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
 
+// execer is what both *sql.DB and *sql.Tx can do.
+type execer interface {
+	Exec(query string, args ...any) (sql.Result, error)
+}
+
+func insertRun(db execer, r *Run) error {
+	targets, err := json.Marshal(r.Targets)
+	if err != nil {
+		return err
+	}
+	res, err := db.Exec(`INSERT INTO runs (name, description, kind, settings, targets, status, error, started)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.Name, r.Description, r.Kind, orEmpty(r.Settings, "{}"), string(targets), orEmpty(r.Status, Running), r.Error, unix(r.Started))
+	if err != nil {
+		return fmt.Errorf("save scan: %w", err)
+	}
+	r.ID, err = res.LastInsertId()
+	return err
+}
+
+func finishRun(tx *sql.Tx, r Run) error {
 	var repStarted, repFinished int64
 	if rep := r.Report; rep != nil {
 		repStarted, repFinished = unix(rep.Started), unix(rep.Finished)
@@ -180,7 +229,7 @@ func (s *Store) Finish(r Run) error {
 			return fmt.Errorf("save scan %d: %w", r.ID, err)
 		}
 	}
-	return tx.Commit()
+	return nil
 }
 
 func saveReport(tx *sql.Tx, id int64, rep *engine.Report) error {

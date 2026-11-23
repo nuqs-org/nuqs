@@ -308,21 +308,25 @@ func (m *Scans) sync() error {
 		}
 		loaded[id] = &entry{scan: fromRun(r), cancel: func() {}, changed: make(chan struct{})}
 	}
+	// Rebuild under the lock from the memory as it is now, not the copy from
+	// before loading: a scan may have started meanwhile, and dropping it
+	// would cut its page off from progress and Stop.
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	// Rebuild in the store's order. Our own running scan is always in there,
-	// it's the newest. Ours that failed to save are kept too.
-	list := make([]*entry, 0, len(runs))
-	for _, sum := range runs {
-		id := strconv.FormatInt(sum.ID, 10)
-		if e := cmp.Or(have[id], loaded[id]); e != nil {
-			list = append(list, e)
-			delete(have, id)
+	current := map[string]*entry{}
+	for _, e := range m.list {
+		current[e.scan.ID] = e
+	}
+	list := make([]*entry, 0, len(runs)+1)
+	for _, e := range m.list {
+		if e.scan.Status == ScanRunning {
+			list = append(list, e) // ours, the newest, never dropped
 		}
 	}
-	for _, e := range m.list {
-		if e.scan.Status == ScanRunning && have[e.scan.ID] != nil {
-			list = append([]*entry{e}, list...) // started after we read the store
+	for _, sum := range runs {
+		id := strconv.FormatInt(sum.ID, 10)
+		if e := cmp.Or(current[id], loaded[id]); e != nil && e.scan.Status != ScanRunning {
+			list = append(list, e)
 		}
 	}
 	m.list = list

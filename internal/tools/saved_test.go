@@ -3,10 +3,13 @@
 package tools
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/nuqs-org/nuqs/internal/engine"
+	"github.com/nuqs-org/nuqs/internal/model"
 	"github.com/nuqs-org/nuqs/internal/store"
 )
 
@@ -207,5 +210,43 @@ func TestFinishedButNotSaved(t *testing.T) {
 func TestCommandLineScanKind(t *testing.T) {
 	if got := (Scan{Kind: "cli"}).KindName(); got != "Command line scan" {
 		t.Errorf("got %q", got)
+	}
+}
+
+// Regression: refreshing the list from the store while a scan starts must
+// not drop the running scan from memory, or its progress and Stop break.
+func TestRefreshKeepsAScanThatStartsMeanwhile(t *testing.T) {
+	st := openStore(t, t.TempDir())
+	for range 50 {
+		r := store.Run{Name: "saved", Kind: "cli", Targets: []string{"127.0.0.1"}, Status: store.Completed, Started: time.Now()}
+		r.Report = &engine.Report{Targets: r.Targets, Findings: []model.Finding{}, Errors: []engine.CheckError{}}
+		for i := range 40 {
+			r.Report.Findings = append(r.Report.Findings, model.Finding{ID: strconv.Itoa(i), CheckID: "telnet-open", Host: "127.0.0.1", Confidence: model.Confirmed})
+		}
+		if err := st.Save(&r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for round := range 10 {
+		release := make(chan struct{})
+		m := &Scans{Service: newTestService(&blockingRunner{release: release, xml: []byte(telnetXML)}), Store: st}
+		listed := make(chan struct{})
+		go func() { m.List(); close(listed) }()             // loads 50 reports, slowly
+		time.Sleep(time.Duration(round) * time.Millisecond) // start at different points of that load
+		s, err := m.Start(NewScan{Kind: "quick", Settings: ScanRequest{Target: "127.0.0.1"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		<-listed
+		if got, ok := m.Get(s.ID); !ok || got.Status != ScanRunning {
+			t.Fatalf("round %d: the running scan was dropped: %+v", round, got)
+		}
+		if err := m.Stop(s.ID); err != nil {
+			t.Fatal(err)
+		}
+		if done := waitFor(t, m, s.ID, finished); done.Status != ScanStopped {
+			t.Fatalf("round %d: stop didn't reach the scan: %+v", round, done)
+		}
+		close(release)
 	}
 }
