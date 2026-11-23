@@ -32,7 +32,7 @@
 
 ## Quick start
 
-You need Go 1.24+ and Nmap.
+You need Go 1.27+ and Nmap.
 
 ```bash
 go build -o nuqs ./cmd/nuqs

@@ -6,6 +6,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -16,13 +17,17 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
+	"text/tabwriter"
 	"time"
 
 	"github.com/nuqs-org/nuqs/internal/api"
 	"github.com/nuqs-org/nuqs/internal/check"
 	"github.com/nuqs-org/nuqs/internal/engine"
+	"github.com/nuqs-org/nuqs/internal/model"
 	"github.com/nuqs-org/nuqs/internal/nmap"
 	"github.com/nuqs-org/nuqs/internal/output"
+	"github.com/nuqs-org/nuqs/internal/store"
 	"github.com/nuqs-org/nuqs/internal/target"
 	"github.com/nuqs-org/nuqs/internal/tools"
 	"github.com/nuqs-org/nuqs/internal/web"
@@ -48,6 +53,8 @@ type App struct {
 	LookPath func(file string) (string, error)
 	// ListenAndServe starts the HTTP server for "nuqs serve". Nil defaults to net/http.
 	ListenAndServe func(ctx context.Context, addr string, h http.Handler) error
+	// DataDir is where scans are saved. Empty means store.DefaultDir().
+	DataDir string
 	// LiveProgress shows scan progress as one line that updates in place.
 	// Set it when Stderr is a terminal. Otherwise progress is a few plain
 	// lines, which read fine in logs and CI.
@@ -58,10 +65,13 @@ const usage = `Nuqs is a non-overengineered vulnerability assessment tool.
 
 Usage:
   nuqs scan [flags] <target>...   scan targets (IP, CIDR, range like 10.0.0.1-20, or hostname)
+  nuqs history [-n 20]            list saved scans, newest first
+  nuqs show [--json] <id>         print a saved scan again
   nuqs serve [flags]              start the local web UI and JSON API server
   nuqs checks                     list the built-in checks
   nuqs version                    print the version
 
+Scans are saved in NUQS_DATA_DIR, or a "nuqs" folder in your config folder.
 Run "nuqs scan -h" or "nuqs serve -h" to see the flags.
 `
 
@@ -76,6 +86,10 @@ func (a *App) Run(ctx context.Context, args []string) int {
 		return a.scan(ctx, args[1:])
 	case "serve":
 		return a.serve(ctx, args[1:])
+	case "history":
+		return a.history(args[1:])
+	case "show":
+		return a.show(args[1:])
 	case "checks":
 		return a.listChecks()
 	case "version", "--version", "-v":
@@ -108,6 +122,7 @@ func (a *App) scan(ctx context.Context, args []string) int {
 	timeout := fs.Duration("timeout", engine.DefaultCheckTimeout, "max time for one check")
 	force := fs.Bool("force", false, fmt.Sprintf("allow scanning more than %d addresses", target.DefaultLimit))
 	nmapPath := fs.String("nmap", "", "path to the nmap binary (default: nmap from PATH)")
+	noSave := fs.Bool("no-save", false, "don't save this scan to the history")
 	fs.Usage = func() {
 		fmt.Fprintln(a.Stderr, "Usage: nuqs scan [flags] <target>...")
 		fs.PrintDefaults()
@@ -183,16 +198,155 @@ func (a *App) scan(ctx context.Context, args []string) int {
 		fmt.Fprintln(a.Stderr, "scan stopped early:", err)
 	}
 
-	if *asJSON {
+	if err := a.printReport(rep, *asJSON); err != nil {
+		return ExitError
+	}
+	if !*noSave {
+		a.saveScan(ctx, targets, rep, err, scanSettings{Target: strings.Join(specs, ", "), Ports: *ports, SkipPing: *skipPing, Workers: *workers, Timeout: timeout.String()})
+	}
+	if ctx.Err() != nil {
+		return ExitError
+	}
+	return ExitOK
+}
+
+func (a *App) printReport(rep *engine.Report, asJSON bool) error {
+	var err error
+	if asJSON {
 		err = output.JSON(a.Stdout, rep)
 	} else {
 		err = output.Text(a.Stdout, rep)
 	}
 	if err != nil {
 		fmt.Fprintln(a.Stderr, "error writing report:", err)
+	}
+	return err
+}
+
+// scanSettings is what "nuqs scan" was run with, saved so the web UI can
+// show it. The names match tools.ScanRequest.
+type scanSettings struct {
+	Target   string `json:"target"`
+	Ports    string `json:"ports"`
+	SkipPing bool   `json:"skip_ping"`
+	Workers  int    `json:"workers"`
+	Timeout  string `json:"timeout"`
+}
+
+// saveScan saves the scan to the history. A scan that ran is worth more
+// than its history entry, so if saving fails we only say so.
+func (a *App) saveScan(ctx context.Context, targets []string, rep *engine.Report, scanErr error, settings scanSettings) {
+	st, err := store.Open(a.dataDir())
+	if err != nil {
+		fmt.Fprintln(a.Stderr, "warning: couldn't save this scan:", err)
+		return
+	}
+	defer func() { _ = st.Close() }()
+	status, msg := store.Completed, ""
+	if ctx.Err() != nil {
+		status = store.Stopped
+	}
+	if scanErr != nil {
+		msg = tools.FriendlyError(scanErr)
+	}
+	raw, _ := json.Marshal(settings) // plain strings and numbers, can't fail
+	r := store.Run{Name: strings.Join(targets, ", "), Kind: "cli", Settings: string(raw), Targets: targets,
+		Status: status, Error: msg, Started: rep.Started, Finished: rep.Finished, Report: rep}
+	if len(r.Name) > 100 {
+		r.Name = r.Name[:97] + "..."
+	}
+	if err := st.Save(&r); err != nil {
+		fmt.Fprintln(a.Stderr, "warning: couldn't save this scan:", err)
+		return
+	}
+	fmt.Fprintf(a.Stderr, "Saved as scan %d. See it again with: nuqs show %d\n", r.ID, r.ID)
+}
+
+func (a *App) dataDir() string {
+	if a.DataDir != "" {
+		return a.DataDir
+	}
+	return store.DefaultDir()
+}
+
+// history lists the saved scans, newest first.
+func (a *App) history(args []string) int {
+	fs := flag.NewFlagSet("history", flag.ContinueOnError)
+	fs.SetOutput(a.Stderr)
+	limit := fs.Int("n", 20, "how many scans to list, 0 for all")
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return ExitOK
+		}
+		return ExitUsage
+	}
+	if fs.NArg() > 0 || *limit < 0 {
+		fmt.Fprintln(a.Stderr, "Usage: nuqs history [-n 20]")
+		return ExitUsage
+	}
+	st, err := store.Open(a.dataDir())
+	if err != nil {
+		fmt.Fprintln(a.Stderr, "error:", err)
 		return ExitError
 	}
-	if ctx.Err() != nil {
+	defer func() { _ = st.Close() }()
+	runs, err := st.Runs(*limit)
+	if err != nil {
+		fmt.Fprintln(a.Stderr, "error:", err)
+		return ExitError
+	}
+	if len(runs) == 0 {
+		fmt.Fprintln(a.Stdout, "No saved scans yet. Run one with: nuqs scan <target>")
+		return ExitOK
+	}
+	tw := tabwriter.NewWriter(a.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "ID\tSTARTED\tSTATUS\tHOSTS\tCRIT\tHIGH\tMED\tLOW\tINFO\tNAME")
+	for _, r := range runs {
+		c := r.Findings
+		fmt.Fprintf(tw, "%d\t%s\t%s\t%d\t%d\t%d\t%d\t%d\t%d\t%s\n", r.ID, r.Started.Local().Format("2006-01-02 15:04"), r.Status, r.Hosts,
+			c[model.Critical], c[model.High], c[model.Medium], c[model.Low], c[model.Info], r.Name)
+	}
+	if err := tw.Flush(); err != nil {
+		return ExitError
+	}
+	return ExitOK
+}
+
+// show prints a saved scan the same way "nuqs scan" did.
+func (a *App) show(args []string) int {
+	fs := flag.NewFlagSet("show", flag.ContinueOnError)
+	fs.SetOutput(a.Stderr)
+	asJSON := fs.Bool("json", false, "print the report as JSON")
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return ExitOK
+		}
+		return ExitUsage
+	}
+	id, err := strconv.ParseInt(fs.Arg(0), 10, 64)
+	if fs.NArg() != 1 || err != nil {
+		fmt.Fprintln(a.Stderr, "Usage: nuqs show [--json] <id>, the IDs are in nuqs history")
+		return ExitUsage
+	}
+	st, err := store.Open(a.dataDir())
+	if err != nil {
+		fmt.Fprintln(a.Stderr, "error:", err)
+		return ExitError
+	}
+	defer func() { _ = st.Close() }()
+	r, err := st.Run(id)
+	if err != nil {
+		fmt.Fprintln(a.Stderr, "error:", err)
+		return ExitError
+	}
+	if r.Report == nil {
+		fmt.Fprintf(a.Stderr, "Scan %d %s without a report: %s\n", id, r.Status, r.Error)
+		return ExitError
+	}
+	if r.Error != "" && !*asJSON {
+		fmt.Fprintf(a.Stderr, "Note: %s\n", r.Error)
+	}
+	if err := a.printReport(r.Report, *asJSON); err != nil {
 		return ExitError
 	}
 	return ExitOK
@@ -259,7 +413,17 @@ func (a *App) serve(ctx context.Context, args []string) int {
 		MaxWorkers:   128,
 		StartedAt:    time.Now(),
 	}
-	scans := &tools.Scans{Service: svc}
+	st, err := store.Open(a.dataDir())
+	if err != nil {
+		fmt.Fprintln(a.Stderr, "error:", err)
+		return ExitError
+	}
+	defer func() { _ = st.Close() }()
+	scans := &tools.Scans{Service: svc, Store: st}
+	if err := scans.Load(); err != nil {
+		fmt.Fprintln(a.Stderr, "error: loading saved scans:", err)
+		return ExitError
+	}
 	// On Ctrl+C stop running scans first. Their live pages then get a last
 	// update and close, so the server can shut down right away.
 	stop := context.AfterFunc(ctx, scans.StopAll)

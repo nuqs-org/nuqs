@@ -57,7 +57,8 @@ func newApp(t *testing.T, r *fakeRunner) (*App, *bytes.Buffer, *bytes.Buffer) {
 			r.path = path
 			return r
 		},
-		Checks: func() []check.Check { return []check.Check{telnet.Check{}} },
+		Checks:  func() []check.Check { return []check.Check{telnet.Check{}} },
+		DataDir: t.TempDir(), // never the real history
 	}, &out, &errOut
 }
 

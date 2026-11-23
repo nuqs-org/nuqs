@@ -2,7 +2,7 @@
 
 ## What you need
 
-- **Go 1.24** or newer
+- **Go 1.27** or newer
 - **Nmap**, installed and on your PATH (`brew install nmap` or `sudo apt install nmap`)
 
 ## Build
@@ -45,6 +45,7 @@ Flags can go before or after the targets.
 | `--timeout 30s` | Max time for one check |
 | `--force` | Allow scanning more than 1024 addresses |
 | `--nmap /path/to/nmap` | Use a specific Nmap binary |
+| `--no-save` | Don't save this scan to the history |
 
 ## Reading the output
 
@@ -57,6 +58,18 @@ Every finding has:
 - **Fix**, what to do about it
 
 If a check couldn't finish (timeout, connection reset and so on), it's listed under "Checks that could not finish". That's not a finding, it just means we couldn't tell.
+
+## History
+
+Every scan is saved, from the CLI and from the web UI, so you can look at it again later.
+
+```bash
+./nuqs history        # the last 20 scans, newest first
+./nuqs history -n 0   # all of them
+./nuqs show 12        # print scan 12 again, add --json for JSON
+```
+
+Scans are saved in one file, `nuqs.db`, in `~/Library/Application Support/nuqs` on macOS and `~/.config/nuqs` on Linux. Set `NUQS_DATA_DIR` to keep it somewhere else.
 
 ## Exit codes
 
@@ -76,7 +89,7 @@ Then open http://127.0.0.1:9002. Pick **New scan**, choose a scan type, enter a 
 
 - It only listens on this computer, because it has no login yet.
 - By default it only scans this computer (`127.0.0.0/8`). To scan your network too, start it with `./nuqs serve --allow 192.168.1.0/24`.
-- One scan runs at a time. The last 50 are kept until you stop the server.
+- One scan runs at a time. Every scan is saved, so they're still there after a restart, and the CLI and the web UI share the same history.
 
 ## Other commands
 

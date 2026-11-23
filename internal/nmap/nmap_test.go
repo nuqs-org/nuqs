@@ -214,7 +214,7 @@ func TestExecRunnerOK(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), "10.0.0.1") {
-		t.Errorf("stdout not returned: %q", out)
+		t.Errorf("stdout not returned: %q", out.String())
 	}
 }
 

@@ -1,10 +1,13 @@
-// Keeps the scans started from the web UI in memory and runs them in the background.
+// Runs the scans started from the web UI in the background, keeps the recent
+// ones in memory and saves every one to the store.
 
 package tools
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -12,6 +15,7 @@ import (
 
 	"github.com/nuqs-org/nuqs/internal/engine"
 	"github.com/nuqs-org/nuqs/internal/progress"
+	"github.com/nuqs-org/nuqs/internal/store"
 )
 
 // ScanStatus is where a scan is in its life.
@@ -77,15 +81,20 @@ func (s Scan) KindName() string {
 		return "Quick scan"
 	case "full":
 		return "Full scan"
+	case "cli":
+		return "Command line scan"
 	default:
 		return "Custom scan"
 	}
 }
 
-// Scans runs scans in the background and remembers the last few in memory.
-// They're gone when the server stops, until we have a proper store.
+// Scans runs scans in the background. The last few stay in memory for fast
+// pages and live progress. With a Store, every scan is also saved, so it's
+// still there after a restart, and older ones load from the store on demand.
 type Scans struct {
 	Service *Service
+	// Store saves scans. Nil keeps them in memory only, like in tests.
+	Store *store.Store
 	// Keep is how many scans to remember. 0 means 50.
 	Keep int
 
@@ -140,11 +149,15 @@ func (m *Scans) Start(in NewScan) (Scan, error) {
 			return Scan{}, ErrBusy
 		}
 	}
-	m.nextID++
+	started := time.Now()
+	id, err := m.newID(name, in, valid, started)
+	if err != nil {
+		return Scan{}, err
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	e := &entry{
 		scan: Scan{
-			ID:          strconv.Itoa(m.nextID),
+			ID:          id,
 			Name:        name,
 			Description: strings.TrimSpace(in.Description),
 			Kind:        in.Kind,
@@ -152,7 +165,7 @@ func (m *Scans) Start(in NewScan) (Scan, error) {
 			Targets:     valid.Targets,
 			Status:      ScanRunning,
 			Phase:       "Starting Nmap",
-			Started:     time.Now(),
+			Started:     started,
 		},
 		cancel:  cancel,
 		changed: make(chan struct{}),
@@ -164,17 +177,37 @@ func (m *Scans) Start(in NewScan) (Scan, error) {
 	return e.snapshot(), nil
 }
 
+// newID saves the new scan to get its ID, or counts up without a store.
+// Callers hold m.mu.
+func (m *Scans) newID(name string, in NewScan, valid ValidatedScan, started time.Time) (string, error) {
+	if m.Store == nil {
+		m.nextID++
+		return strconv.Itoa(m.nextID), nil
+	}
+	settings, _ := json.Marshal(in.Settings) // plain strings and numbers, can't fail
+	r := store.Run{Name: name, Description: strings.TrimSpace(in.Description), Kind: in.Kind,
+		Settings: string(settings), Targets: valid.Targets, Status: store.Running, Started: started}
+	if err := m.Store.Create(&r); err != nil {
+		return "", fmt.Errorf("couldn't save the scan: %w", err)
+	}
+	return strconv.FormatInt(r.ID, 10), nil
+}
+
 // trim forgets the oldest finished scans past Keep. Callers hold m.mu.
 func (m *Scans) trim() {
-	keep := m.Keep
-	if keep <= 0 {
-		keep = 50
-	}
+	keep := m.keep()
 	for i := len(m.list) - 1; i >= 0 && len(m.list) > keep; i-- {
 		if m.list[i].scan.Status != ScanRunning {
 			m.list = append(m.list[:i], m.list[i+1:]...)
 		}
 	}
+}
+
+func (m *Scans) keep() int {
+	if m.Keep <= 0 {
+		return 50
+	}
+	return m.Keep
 }
 
 func (m *Scans) run(ctx context.Context, e *entry, valid ValidatedScan) {
@@ -192,8 +225,11 @@ func (m *Scans) run(ctx context.Context, e *entry, valid ValidatedScan) {
 			}
 		})
 	})
-	m.update(e, func(s *Scan) {
-		s.Finished = time.Now()
+	// Work out how it ended, save that, then show it. Saving first means
+	// anyone who sees the scan finish can also find it in the store.
+	finished := time.Now()
+	end := func(s *Scan) {
+		s.Finished = finished
 		s.Report = rep
 		s.Phase, s.Remaining = "", ""
 		if rep != nil {
@@ -211,7 +247,76 @@ func (m *Scans) run(ctx context.Context, e *entry, valid ValidatedScan) {
 				s.Error = FriendlyError(err)
 			}
 		}
+	}
+	m.mu.Lock()
+	done := e.scan
+	m.mu.Unlock()
+	end(&done)
+	saveErr := m.save(done)
+	m.update(e, func(s *Scan) {
+		end(s)
+		if saveErr != nil {
+			s.Error = strings.TrimSpace(s.Error + " This scan couldn't be saved (" + saveErr.Error() + "), so it'll be gone after a restart.")
+		}
 	})
+}
+
+// save writes a finished scan to the store, if there is one.
+func (m *Scans) save(s Scan) error {
+	if m.Store == nil {
+		return nil
+	}
+	id, _ := strconv.ParseInt(s.ID, 10, 64)
+	return m.Store.Finish(store.Run{ID: id, Status: string(s.Status), Error: s.Error, Finished: s.Finished, Report: s.Report})
+}
+
+// Load fills the memory with the newest saved scans. "nuqs serve" calls it
+// once when it starts, after marking scans a crash left running as stopped.
+func (m *Scans) Load() error {
+	if m.Store == nil {
+		return nil
+	}
+	if err := m.Store.CloseUnfinished(); err != nil {
+		return err
+	}
+	runs, err := m.Store.Runs(m.keep())
+	if err != nil {
+		return err
+	}
+	list := make([]*entry, 0, len(runs))
+	for _, sum := range runs {
+		r, err := m.Store.Run(sum.ID)
+		if err != nil {
+			return err
+		}
+		list = append(list, &entry{scan: fromRun(r), cancel: func() {}, changed: make(chan struct{})})
+	}
+	m.mu.Lock()
+	m.list = list
+	m.mu.Unlock()
+	return nil
+}
+
+// fromRun turns a saved run back into a scan.
+func fromRun(r store.Run) Scan {
+	s := Scan{
+		ID:          strconv.FormatInt(r.ID, 10),
+		Name:        r.Name,
+		Description: r.Description,
+		Kind:        r.Kind,
+		Targets:     r.Targets,
+		Status:      ScanStatus(r.Status),
+		Started:     r.Started,
+		Finished:    r.Finished,
+		Error:       r.Error,
+		Report:      r.Report,
+	}
+	_ = json.Unmarshal([]byte(r.Settings), &s.Settings) // a scan from "nuqs scan" has no web settings
+	if r.Report != nil {
+		s.Percent = 100
+		s.HostsFound = len(r.Report.Hosts)
+	}
+	return s
 }
 
 // update changes a scan under the lock and wakes anyone watching it.
@@ -241,16 +346,31 @@ func (m *Scans) Get(id string) (Scan, bool) {
 }
 
 // Watch returns the scan as it is now and a channel that's closed the next
-// time it changes. That's how the live page knows when to update.
+// time it changes. That's how the live page knows when to update. A scan
+// that's only in the store is finished, so it never changes.
 func (m *Scans) Watch(id string) (Scan, <-chan struct{}, bool) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	for _, e := range m.list {
 		if e.scan.ID == id {
+			defer m.mu.Unlock()
 			return e.snapshot(), e.changed, true
 		}
 	}
-	return Scan{}, nil, false
+	m.mu.Unlock()
+	return m.saved(id)
+}
+
+// saved loads an older scan that's no longer in memory.
+func (m *Scans) saved(id string) (Scan, <-chan struct{}, bool) {
+	n, err := strconv.ParseInt(id, 10, 64)
+	if m.Store == nil || err != nil {
+		return Scan{}, nil, false
+	}
+	r, err := m.Store.Run(n)
+	if err != nil {
+		return Scan{}, nil, false
+	}
+	return fromRun(r), make(chan struct{}), true
 }
 
 // Stop stops a running scan. What it found so far is kept.
@@ -264,6 +384,9 @@ func (m *Scans) Stop(id string) error {
 			}
 			return nil
 		}
+	}
+	if _, _, ok := m.saved(id); ok {
+		return nil // a saved scan is already done
 	}
 	return ErrNotFound
 }

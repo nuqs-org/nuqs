@@ -112,9 +112,9 @@ The docs site exports to one PDF for submission.
 
 **Goal:** scans are saved, every scan shows what changed, and it all works from the browser.
 
-- [ ] SQLite with `modernc.org/sqlite` (pure Go, our first dependency, reason written in [Decisions](design/decisions.md))
-- [ ] `internal/store`: scan runs, hosts, services, findings, check errors, simple numbered migrations
-- [ ] Every scan is saved (`--no-save` to skip), `nuqs history`, `nuqs show <run>`
+- [x] SQLite with `modernc.org/sqlite` (pure Go, our first dependency, reason written in [Decisions](design/decisions.md))
+- [x] `internal/store`: scan runs, hosts, services, findings, check errors, simple numbered migrations
+- [x] Every scan is saved (`--no-save` to skip), `nuqs history`, `nuqs show <run>`
 - [ ] Compare runs with stable finding IDs: **new**, **fixed**, **still open**, plus `first_seen` and `last_seen`
 - [ ] `nuqs diff <old> <new>`, and a short "since last scan" summary after every scan
 - [ ] `--fail-on high` exits with code 3 when there's a finding at or above that level

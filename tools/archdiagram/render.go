@@ -111,7 +111,7 @@ var layers = []Layer{
 	{"Programs", []string{"cmd/*"}},
 	{"Interfaces", []string{"internal/cli", "internal/web", "internal/api", "internal/output"}},
 	{"Services", []string{"internal/tools"}},
-	{"Scanning", []string{"internal/engine", "internal/nmap", "internal/progress", "internal/target"}},
+	{"Scanning", []string{"internal/engine", "internal/nmap", "internal/progress", "internal/store", "internal/target"}},
 	{"Checks", []string{"checks", "checks/*", "internal/sshprobe"}},
 	{"Foundation", []string{"internal/model", "internal/check", "internal/version"}},
 }

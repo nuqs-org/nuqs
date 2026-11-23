@@ -26,9 +26,18 @@ web UI      ─┘
 
 The CLI, the API and the web UI never contain scan logic. They only call the engine. That way all three always behave the same.
 
-## Standard library only (for now)
+## Standard library only, plus SQLite
 
-The core has zero dependencies. Every dependency is code we have to trust and keep updated. We'll add one only when it saves real work, like SQLite in week 2, and we'll write the reason down here when we do.
+The core has one dependency. Every dependency is code we have to trust and keep updated, so we add one only when it saves real work, and write the reason down here.
+
+### SQLite with modernc.org/sqlite (week 2)
+
+Scans, history and diffs need a database that survives restarts, can be shared by the CLI and the server at the same time, and doesn't need its own server.
+
+- **SQLite** is one file next to Nuqs, nothing to install or run. It handles the CLI and the server writing at the same time (WAL mode), and it's the most tested database there is.
+- **`modernc.org/sqlite`** is SQLite translated to pure Go. `go build` still needs no C compiler, so cross-compiling for every OS keeps working. The well known alternative, `mattn/go-sqlite3`, needs cgo.
+- We use it through Go's own `database/sql`, so only one line in `internal/store` knows which driver it is.
+- A JSON file was the other option. It's fine for a few records, but history and diffs need to search findings across many scans, and we'd end up writing our own locking and indexes.
 
 ## Checks are listed by hand
 
