@@ -4,6 +4,7 @@
 package tools
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -225,40 +226,35 @@ func (m *Scans) run(ctx context.Context, e *entry, valid ValidatedScan) {
 			}
 		})
 	})
-	// Work out how it ended, save that, then show it. Saving first means
-	// anyone who sees the scan finish can also find it in the store.
-	finished := time.Now()
-	end := func(s *Scan) {
-		s.Finished = finished
-		s.Report = rep
-		s.Phase, s.Remaining = "", ""
-		if rep != nil {
-			s.Percent = 100
-		}
-		switch {
-		case ctx.Err() != nil:
-			s.Status = ScanStopped
-		case rep == nil:
-			s.Status = ScanFailed
-			s.Error = FriendlyError(err)
-		default:
-			s.Status = ScanCompleted
-			if err != nil {
-				s.Error = FriendlyError(err)
-			}
-		}
-	}
+	// Work out how it ended once, save that, then show it. Saving first
+	// means anyone who sees the scan finish can also find it in the store,
+	// and the store and the page can't disagree. No events come after
+	// RunValidated returns, so nothing else changes the scan meanwhile.
 	m.mu.Lock()
 	done := e.scan
 	m.mu.Unlock()
-	end(&done)
-	saveErr := m.save(done)
-	m.update(e, func(s *Scan) {
-		end(s)
-		if saveErr != nil {
-			s.Error = strings.TrimSpace(s.Error + " This scan couldn't be saved (" + saveErr.Error() + "), so it'll be gone after a restart.")
+	done.Finished = time.Now()
+	done.Report = rep
+	done.Phase, done.Remaining = "", ""
+	if rep != nil {
+		done.Percent = 100
+	}
+	switch {
+	case ctx.Err() != nil:
+		done.Status = ScanStopped
+	case rep == nil:
+		done.Status = ScanFailed
+		done.Error = FriendlyError(err)
+	default:
+		done.Status = ScanCompleted
+		if err != nil {
+			done.Error = FriendlyError(err)
 		}
-	})
+	}
+	if saveErr := m.save(done); saveErr != nil {
+		done.Error = strings.TrimSpace(done.Error + " This scan couldn't be saved (" + saveErr.Error() + "), so it'll be gone after a restart.")
+	}
+	m.update(e, func(s *Scan) { *s = done })
 }
 
 // save writes a finished scan to the store, if there is one.
@@ -270,8 +266,8 @@ func (m *Scans) save(s Scan) error {
 	return m.Store.Finish(store.Run{ID: id, Status: string(s.Status), Error: s.Error, Finished: s.Finished, Report: s.Report})
 }
 
-// Load fills the memory with the newest saved scans. "nuqs serve" calls it
-// once when it starts, after marking scans a crash left running as stopped.
+// Load marks scans a crashed server left running as stopped, then fills
+// the memory with the newest saved scans. "nuqs serve" calls it once at start.
 func (m *Scans) Load() error {
 	if m.Store == nil {
 		return nil
@@ -279,21 +275,57 @@ func (m *Scans) Load() error {
 	if err := m.Store.CloseUnfinished(); err != nil {
 		return err
 	}
+	return m.sync()
+}
+
+// sync makes the memory match the newest saved scans, adding ones it
+// doesn't have yet, like ones "nuqs scan" saved while the server runs. That
+// way the web UI and the CLI show the same list.
+func (m *Scans) sync() error {
+	if m.Store == nil {
+		return nil
+	}
 	runs, err := m.Store.Runs(m.keep())
 	if err != nil {
 		return err
 	}
-	list := make([]*entry, 0, len(runs))
+	m.mu.Lock()
+	have := map[string]*entry{}
+	for _, e := range m.list {
+		have[e.scan.ID] = e
+	}
+	m.mu.Unlock()
+	loaded := map[string]*entry{}
 	for _, sum := range runs {
+		id := strconv.FormatInt(sum.ID, 10)
+		// Skip what we have, and a scan another server is still running.
+		if have[id] != nil || sum.Status == store.Running {
+			continue
+		}
 		r, err := m.Store.Run(sum.ID)
 		if err != nil {
 			return err
 		}
-		list = append(list, &entry{scan: fromRun(r), cancel: func() {}, changed: make(chan struct{})})
+		loaded[id] = &entry{scan: fromRun(r), cancel: func() {}, changed: make(chan struct{})}
 	}
 	m.mu.Lock()
+	defer m.mu.Unlock()
+	// Rebuild in the store's order. Our own running scan is always in there,
+	// it's the newest. Ours that failed to save are kept too.
+	list := make([]*entry, 0, len(runs))
+	for _, sum := range runs {
+		id := strconv.FormatInt(sum.ID, 10)
+		if e := cmp.Or(have[id], loaded[id]); e != nil {
+			list = append(list, e)
+			delete(have, id)
+		}
+	}
+	for _, e := range m.list {
+		if e.scan.Status == ScanRunning && have[e.scan.ID] != nil {
+			list = append([]*entry{e}, list...) // started after we read the store
+		}
+	}
 	m.list = list
-	m.mu.Unlock()
 	return nil
 }
 
@@ -328,8 +360,10 @@ func (m *Scans) update(e *entry, change func(*Scan)) {
 	e.changed = make(chan struct{})
 }
 
-// List returns every scan we remember, newest first.
+// List returns the newest scans, newest first. With a store that includes
+// scans the CLI saved since the server started.
 func (m *Scans) List() []Scan {
+	_ = m.sync() // if the store can't be read, the scans in memory still show
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	out := make([]Scan, len(m.list))

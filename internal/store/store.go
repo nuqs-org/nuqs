@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/nuqs-org/nuqs/internal/engine"
@@ -85,9 +86,20 @@ func Open(dir string) (*Store, error) {
 		return nil, fmt.Errorf("make the data folder: %w", err)
 	}
 	path := filepath.Join(dir, "nuqs.db")
+	// Make the file ourselves so it's private from the start. SQLite gives
+	// its -wal and -shm files the same permissions as the database.
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("open %s: %w", path, err)
+	}
+	_ = f.Close()
+	_ = os.Chmod(path, 0o600) // in case it was made before with looser permissions
 	// WAL lets the CLI and the server use the file at the same time, and
 	// busy_timeout makes one wait a bit for the other instead of failing.
-	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)")
+	// The path is escaped because "?", "#" and "%" mean something in a
+	// SQLite file: URI, and a folder name can contain any of them.
+	uri := "file:" + uriEscaper.Replace(path) + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)"
+	db, err := sql.Open("sqlite", uri)
 	if err != nil {
 		return nil, fmt.Errorf("open %s: %w", path, err)
 	}
@@ -99,9 +111,10 @@ func Open(dir string) (*Store, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("open %s: %w", path, err)
 	}
-	_ = os.Chmod(path, 0o600) // scan results are nobody else's business
 	return s, nil
 }
+
+var uriEscaper = strings.NewReplacer("%", "%25", "?", "%3F", "#", "%23")
 
 // Close closes the database.
 func (s *Store) Close() error { return s.db.Close() }

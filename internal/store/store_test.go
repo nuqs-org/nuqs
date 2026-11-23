@@ -225,6 +225,52 @@ func TestReopenKeepsDataAndSkipsDoneMigrations(t *testing.T) {
 	}
 }
 
+func TestOddFolderNames(t *testing.T) {
+	// "?", "#" and "%" mean something in a SQLite URI, spaces are normal on macOS.
+	for _, name := range []string{"Application Support", "we#ird", "q?mark", "100% sure", "a%3Fb"} {
+		dir := filepath.Join(t.TempDir(), name)
+		s, err := Open(dir)
+		if err != nil {
+			t.Fatalf("%q: %v", name, err)
+		}
+		r := Run{Name: name, Kind: "cli", Targets: []string{"x"}, Status: Completed, Started: at}
+		if err := s.Save(&r); err != nil {
+			t.Fatal(err)
+		}
+		s.Close()
+		entries, _ := os.ReadDir(filepath.Dir(dir))
+		if len(entries) != 1 || entries[0].Name() != name {
+			t.Errorf("%q: the database went somewhere else: %v", name, entries)
+		}
+		s, err = Open(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, err := s.Run(1); err != nil || got.Name != name {
+			t.Errorf("%q: reopened %+v, %v", name, got, err)
+		}
+		s.Close()
+	}
+}
+
+func TestDatabaseFilesArePrivate(t *testing.T) {
+	s, dir := open(t)
+	r := Run{Name: "x", Kind: "cli", Targets: []string{"x"}, Status: Completed, Started: at, Report: sampleReport()}
+	if err := s.Save(&r); err != nil {
+		t.Fatal(err)
+	}
+	// While it's open, the WAL files hold scan data too.
+	for _, name := range []string{"nuqs.db", "nuqs.db-wal", "nuqs.db-shm"} {
+		info, err := os.Stat(filepath.Join(dir, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != 0o600 {
+			t.Errorf("%s mode %v", name, info.Mode().Perm())
+		}
+	}
+}
+
 func TestNewerDatabaseIsRefused(t *testing.T) {
 	_, dir := open(t)
 	s, _ := Open(dir)

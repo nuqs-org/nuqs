@@ -98,6 +98,64 @@ func TestOlderScansLoadFromTheStore(t *testing.T) {
 	}
 }
 
+func TestListPicksUpScansTheCLISaved(t *testing.T) {
+	st := openStore(t, t.TempDir())
+	m := &Scans{Service: newTestService(&fakeRunner{xml: []byte(telnetXML)}), Store: st, Keep: 2}
+	if err := m.Load(); err != nil {
+		t.Fatal(err)
+	}
+	web, _ := m.Start(NewScan{Kind: "quick", Settings: ScanRequest{Target: "127.0.0.1"}})
+	waitFor(t, m, web.ID, finished)
+
+	// "nuqs scan" saves two scans while the server runs.
+	for range 2 {
+		r := store.Run{Name: "from cli", Kind: "cli", Targets: []string{"10.0.0.1"}, Status: store.Completed, Started: time.Now()}
+		if err := st.Save(&r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	list := m.List()
+	if len(list) != 2 || list[0].ID != "3" || list[1].ID != "2" || list[0].KindName() != "Command line scan" {
+		t.Fatalf("want the 2 newest, got %+v", list)
+	}
+	if again := m.List(); len(again) != 2 || again[0].ID != "3" {
+		t.Errorf("listing twice should give the same: %+v", again)
+	}
+	if old, ok := m.Get(web.ID); !ok || old.Report == nil {
+		t.Errorf("the web scan that dropped off the list still loads: %+v", old)
+	}
+
+	// A scan another server is still running isn't listed until it's done.
+	other := store.Run{Name: "elsewhere", Kind: "quick", Targets: []string{"10.0.0.1"}, Started: time.Now()}
+	if err := st.Create(&other); err != nil {
+		t.Fatal(err)
+	}
+	m.Keep = 10
+	for _, s := range m.List() {
+		if s.ID == "4" {
+			t.Error("a scan running elsewhere shouldn't be listed")
+		}
+	}
+
+	// Our own running scan stays at the top.
+	release := make(chan struct{})
+	m.Service = newTestService(&blockingRunner{release: release, xml: []byte(telnetXML)})
+	running, err := m.Start(NewScan{Kind: "quick", Settings: ScanRequest{Target: "127.0.0.1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if list := m.List(); list[0].ID != running.ID || list[0].Status != ScanRunning {
+		t.Errorf("running scan not first: %+v", list[0])
+	}
+	close(release)
+	waitFor(t, m, running.ID, finished)
+
+	st.Close()
+	if len(m.List()) == 0 {
+		t.Error("the scans in memory should still show when the store can't be read")
+	}
+}
+
 func TestLoadClosesScansACrashLeftRunning(t *testing.T) {
 	st := openStore(t, t.TempDir())
 	r := store.Run{Name: "cut off", Kind: "quick", Targets: []string{"127.0.0.1"}, Started: time.Now()}
