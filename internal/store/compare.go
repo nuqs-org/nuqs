@@ -3,6 +3,7 @@
 package store
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"slices"
@@ -37,7 +38,7 @@ func (s *Store) Previous(id int64) (Run, error) {
 			break
 		}
 	}
-	if err := rows.Close(); err != nil {
+	if err := cmp.Or(rows.Err(), rows.Close()); err != nil {
 		return Run{}, fmt.Errorf("find previous scan: %w", err)
 	}
 	if match == 0 {
