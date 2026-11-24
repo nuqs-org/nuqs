@@ -24,6 +24,7 @@ import (
 	"github.com/nuqs-org/nuqs/internal/api"
 	"github.com/nuqs-org/nuqs/internal/auth"
 	"github.com/nuqs-org/nuqs/internal/check"
+	"github.com/nuqs-org/nuqs/internal/diff"
 	"github.com/nuqs-org/nuqs/internal/engine"
 	"github.com/nuqs-org/nuqs/internal/model"
 	"github.com/nuqs-org/nuqs/internal/nmap"
@@ -70,6 +71,7 @@ Usage:
   nuqs scan [flags] <target>...        scan targets (IP, CIDR, range like 10.0.0.1-20, or hostname)
   nuqs history [-n 20]                 list saved scans, newest first
   nuqs show [--json] <id>              print a saved scan again
+  nuqs diff [--json] <old> [new]       what changed between two saved scans
   nuqs serve [flags]                   start the web UI and JSON API server
   nuqs user reset-password <username>  issue a one-time password reset code
   nuqs checks                          list the built-in checks
@@ -92,6 +94,8 @@ func (a *App) Run(ctx context.Context, args []string) int {
 		return a.history(args[1:])
 	case "show":
 		return a.show(args[1:])
+	case "diff":
+		return a.diff(args[1:])
 	case "serve":
 		return a.serve(ctx, args[1:])
 	case "user":
@@ -239,8 +243,9 @@ type scanSettings struct {
 	Timeout  string `json:"timeout"`
 }
 
-// saveScan saves the scan to the history. A scan that ran is worth more
-// than its history entry, so if saving fails we only say so.
+// saveScan saves the scan to the history and says what changed since the
+// last scan of the same targets. A scan that ran is worth more than its
+// history entry, so if saving fails we only say so.
 func (a *App) saveScan(ctx context.Context, targets []string, rep *engine.Report, scanErr error, settings scanSettings) {
 	st, err := store.Open(a.dataDir())
 	if err != nil {
@@ -266,6 +271,21 @@ func (a *App) saveScan(ctx context.Context, targets []string, rep *engine.Report
 		return
 	}
 	fmt.Fprintf(a.Stderr, "Saved as scan %d. See it again with: nuqs show %d\n", r.ID, r.ID)
+	if r.Status == store.Completed && r.Error == "" {
+		a.sinceLastScan(st, r.ID, rep)
+	}
+}
+
+// sinceLastScan prints the one line summary of what changed since the last
+// scan of the same targets and ports, if there is one.
+func (a *App) sinceLastScan(st *store.Store, id int64, rep *engine.Report) {
+	prev, err := st.Previous(id)
+	if err != nil {
+		return // no earlier scan to compare with, or it couldn't be read
+	}
+	d := diff.Compare(prev.Report, rep)
+	fmt.Fprintf(a.Stderr, "Since scan %d (%s): %s. See what changed with: nuqs diff %d\n",
+		prev.ID, prev.Started.Local().Format("2006-01-02 15:04"), d.Summary(), id)
 }
 
 func (a *App) dataDir() string {
@@ -353,6 +373,90 @@ func (a *App) show(args []string) int {
 		fmt.Fprintf(a.Stderr, "Note: %s\n", r.Error)
 	}
 	if err := a.printReport(r.Report, *asJSON); err != nil {
+		return ExitError
+	}
+	return ExitOK
+}
+
+// diff prints what changed between two saved scans. With one ID it compares
+// that scan with the last finished scan of the same targets and ports.
+func (a *App) diff(args []string) int {
+	fs := flag.NewFlagSet("diff", flag.ContinueOnError)
+	fs.SetOutput(a.Stderr)
+	asJSON := fs.Bool("json", false, "print the comparison as JSON")
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return ExitOK
+		}
+		return ExitUsage
+	}
+	ids := make([]int64, fs.NArg())
+	bad := fs.NArg() < 1 || fs.NArg() > 2
+	for i, arg := range fs.Args() {
+		var err error
+		ids[i], err = strconv.ParseInt(arg, 10, 64)
+		bad = bad || err != nil
+	}
+	if bad {
+		fmt.Fprintln(a.Stderr, "Usage: nuqs diff [--json] <old> [new], the IDs are in nuqs history")
+		return ExitUsage
+	}
+	st, err := store.Open(a.dataDir())
+	if err != nil {
+		fmt.Fprintln(a.Stderr, "error:", err)
+		return ExitError
+	}
+	defer func() { _ = st.Close() }()
+
+	cur, err := st.Run(ids[len(ids)-1])
+	var old store.Run
+	switch {
+	case err != nil:
+	case len(ids) == 2:
+		old, err = st.Run(ids[0])
+	default:
+		old, err = st.Previous(cur.ID)
+		if errors.Is(err, store.ErrNotFound) {
+			fmt.Fprintf(a.Stderr, "Scan %d has no earlier finished scan of the same targets and ports. Pick one with: nuqs diff <old> %d\n", cur.ID, cur.ID)
+			return ExitError
+		}
+	}
+	if err != nil {
+		fmt.Fprintln(a.Stderr, "error:", err)
+		return ExitError
+	}
+	for _, r := range []store.Run{old, cur} {
+		if r.Report == nil {
+			fmt.Fprintf(a.Stderr, "Scan %d %s without a report, so there's nothing to compare.\n", r.ID, r.Status)
+			return ExitError
+		}
+		if r.Status != store.Completed || r.Error != "" {
+			why := r.Status
+			if r.Error != "" {
+				why = r.Error
+			}
+			fmt.Fprintf(a.Stderr, "Note: scan %d didn't finish cleanly (%s), so it may have missed findings.\n", r.ID, why)
+		}
+	}
+	if !store.SameScope(old, cur) {
+		fmt.Fprintln(a.Stderr, "Note: these scans didn't cover the same targets and ports, so some findings may show as new or fixed only because of that.")
+	}
+
+	d := diff.Compare(old.Report, cur.Report)
+	d.Old.ID, d.New.ID = old.ID, cur.ID
+	seen, err := st.Seen(d.IDs())
+	if err != nil {
+		fmt.Fprintln(a.Stderr, "error:", err)
+		return ExitError
+	}
+	d.SetSeen(func(id string) (time.Time, time.Time) { return seen[id].First, seen[id].Last })
+	if *asJSON {
+		err = output.DiffJSON(a.Stdout, d)
+	} else {
+		err = output.DiffText(a.Stdout, d)
+	}
+	if err != nil {
+		fmt.Fprintln(a.Stderr, "error writing comparison:", err)
 		return ExitError
 	}
 	return ExitOK

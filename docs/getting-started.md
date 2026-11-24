@@ -69,6 +69,21 @@ Every scan is saved, from the CLI and from the web UI, so you can look at it aga
 ./nuqs show 12        # print scan 12 again, add --json for JSON
 ```
 
+## What changed
+
+After every scan, Nuqs compares it with the last finished scan of the same targets and ports and prints one line:
+
+```
+Since scan 11 (2026-11-24 10:02): 1 new, 2 fixed, 5 still open. See what changed with: nuqs diff 12
+```
+
+```bash
+./nuqs diff 12        # scan 12 against the last scan of the same targets and ports
+./nuqs diff 9 12      # any two scans, older one first, add --json for JSON
+```
+
+Findings are matched by check, host and port. A finding only counts as **fixed** when the newer scan looked again and didn't find it. If the host didn't answer or the check couldn't finish, it's listed as **not checked** instead. Scans that stopped early aren't used for the automatic comparison, because everything they missed would look fixed.
+
 Scans are saved in one file, `nuqs.db`, in `~/Library/Application Support/nuqs` on macOS and `~/.config/nuqs` on Linux. Set `NUQS_DATA_DIR` to keep it somewhere else.
 
 ## Exit codes

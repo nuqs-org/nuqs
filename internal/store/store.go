@@ -41,7 +41,7 @@ type Run struct {
 	Description string
 	Kind        string // quick, full, custom, or cli for "nuqs scan"
 	StartedBy   string // authenticated username that launched the scan, if any
-	Settings    string // the scan settings as JSON, the store doesn't look inside
+	Settings    string // the scan settings as JSON, the store only reads the ports (see SameScope)
 	Targets     []string
 	Status      string
 	Error       string

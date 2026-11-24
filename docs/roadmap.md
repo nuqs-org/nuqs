@@ -115,8 +115,8 @@ The docs site exports to one PDF for submission.
 - [x] SQLite with `modernc.org/sqlite` (pure Go, our first dependency, reason written in [Decisions](design/decisions.md))
 - [x] `internal/store`: scan runs, hosts, services, findings, check errors, simple numbered migrations
 - [x] Every scan is saved (`--no-save` to skip), `nuqs history`, `nuqs show <run>`
-- [ ] Compare runs with stable finding IDs: **new**, **fixed**, **still open**, plus `first_seen` and `last_seen`
-- [ ] `nuqs diff <old> <new>`, and a short "since last scan" summary after every scan
+- [x] Compare runs with stable finding IDs: **new**, **fixed**, **still open**, plus `first_seen` and `last_seen`
+- [x] `nuqs diff <old> <new>`, and a short "since last scan" summary after every scan
 - [ ] `--fail-on high` exits with code 3 when there's a finding at or above that level
 - [ ] **First API:** `nuqs serve` with start a scan, scan status, history, results, diff, a login token, and **allowed targets** (it refuses to scan anything else)
 - [ ] **First web UI** on top of it, embedded in the binary: new scan, results, finding detail (evidence, confidence, fix), history, diff
