@@ -82,6 +82,8 @@ Since scan 11 (2026-11-24 10:02): 1 new, 2 fixed, 5 still open. See what changed
 ./nuqs diff 9 12      # any two scans, older one first, add --json for JSON
 ```
 
+The web server has the same comparison as JSON at `GET /api/scans/12/diff`, or `GET /api/scans/12/diff?with=9` for two scans you pick.
+
 Findings are matched by check, host and port. A finding only counts as **fixed** when the newer scan looked again and didn't find it, and it says why: the port is no longer open, or the check no longer finds it. If the host didn't answer or the check couldn't finish, it's listed as **not checked** instead. Scans that stopped early aren't used for the automatic comparison, because everything they missed would look fixed.
 
 Scans are saved in one file, `nuqs.db`, in `~/Library/Application Support/nuqs` on macOS and `~/.config/nuqs` on Linux. Set `NUQS_DATA_DIR` to keep it somewhere else.
@@ -93,6 +95,13 @@ Scans are saved in one file, `nuqs.db`, in `~/Library/Application Support/nuqs` 
 | 0 | Scan finished (with or without findings) |
 | 1 | Scan couldn't run, or was stopped |
 | 2 | The command was typed wrong |
+| 3 | `--fail-on` was set and the scan found something at or above that severity |
+
+To fail a CI job on serious findings:
+
+```bash
+./nuqs scan --fail-on high 10.0.0.0/24
+```
 
 ## Web UI
 

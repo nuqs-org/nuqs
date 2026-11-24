@@ -117,7 +117,7 @@ The docs site exports to one PDF for submission.
 - [x] Every scan is saved (`--no-save` to skip), `nuqs history`, `nuqs show <run>`
 - [x] Compare runs with stable finding IDs: **new**, **fixed**, **still open**, plus `first_seen` and `last_seen`
 - [x] `nuqs diff <old> <new>`, and a short "since last scan" summary after every scan
-- [ ] `--fail-on high` exits with code 3 when there's a finding at or above that level
+- [x] `--fail-on high` exits with code 3 when there's a finding at or above that level
 - [ ] **First API:** `nuqs serve` with start a scan, scan status, history, results, diff, a login token, and **allowed targets** (it refuses to scan anything else)
 - [ ] **First web UI** on top of it, embedded in the binary: new scan, results, finding detail (evidence, confidence, fix), history, diff
 - [ ] 5 checks: `openssh-vulnerable-version`, `elasticsearch-no-auth`, `memcached-exposed`, `http-directory-listing`, `tls-certificate-problems` (expired, self-signed, wrong name)

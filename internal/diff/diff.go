@@ -47,6 +47,10 @@ type Result struct {
 	Fixed      []Item `json:"fixed"`
 	Open       []Item `json:"still_open"`
 	NotChecked []Item `json:"not_checked"`
+
+	// Notes say when the comparison is less certain. Compare leaves it
+	// empty, the caller knows more about the two scans.
+	Notes []string `json:"notes,omitempty"`
 }
 
 // Compare sorts the findings of old and new. Findings match on their ID,

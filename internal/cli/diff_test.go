@@ -116,3 +116,35 @@ func TestDiffErrors(t *testing.T) {
 		t.Errorf("unknown second scan: exit %d", code)
 	}
 }
+
+func TestFailOn(t *testing.T) {
+	app, _, errOut := newApp(t, &fakeRunner{})
+	ctx := context.Background()
+	cases := []struct {
+		level string
+		want  int
+	}{
+		{"", ExitOK},
+		{"critical", ExitOK},
+		{"high", ExitOK},
+		{"medium", ExitFindings},
+		{"INFO", ExitFindings},
+		{"bad", ExitUsage},
+	}
+	for _, c := range cases {
+		errOut.Reset()
+		args := []string{"scan", "--no-save", "192.168.1.0/30", "-p", "23"}
+		if c.level != "" {
+			args = append(args, "--fail-on", c.level)
+		}
+		if code := app.Run(ctx, args); code != c.want {
+			t.Errorf("--fail-on %q: exit %d, want %d\n%s", c.level, code, c.want, errOut)
+		}
+		if c.want == ExitFindings && !strings.Contains(errOut.String(), "1 finding(s) at") {
+			t.Errorf("--fail-on %q should say why it failed:\n%s", c.level, errOut)
+		}
+	}
+	if code := app.Run(ctx, []string{"diff", "0", "1"}); code != ExitUsage {
+		t.Errorf("scan IDs start at 1: exit %d", code)
+	}
+}

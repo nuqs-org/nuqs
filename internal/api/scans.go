@@ -1,4 +1,4 @@
-// The /api/scans endpoints: start a scan in the background, list scans, follow one live and stop it.
+// The /api/scans endpoints: start a scan in the background, list scans, follow one live, stop it and compare it with an older one.
 
 package api
 
@@ -11,6 +11,7 @@ import (
 	"mime"
 	"net"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/nuqs-org/nuqs/internal/auth"
@@ -48,6 +49,7 @@ func (h *Handler) registerScans(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/scans/{id}/report/{format}", h.downloadReport)
 	mux.HandleFunc("GET /api/scans/{id}/events", h.scanEvents)
 	mux.HandleFunc("POST /api/scans/{id}/stop", h.stopScan)
+	mux.HandleFunc("GET /api/scans/{id}/diff", h.diffScan)
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
@@ -164,6 +166,41 @@ func (h *Handler) downloadReport(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	_, _ = w.Write(body.Bytes())
+}
+
+// diffScan says what changed since an older scan: ?with=<id>, or by default
+// the last clean scan of the same targets and ports. The JSON is the same as
+// "nuqs diff --json".
+func (h *Handler) diffScan(w http.ResponseWriter, r *http.Request) {
+	if h.Scans.Store == nil {
+		http.Error(w, "Comparing needs saved scans.", http.StatusNotFound)
+		return
+	}
+	cur, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || cur < 1 {
+		http.Error(w, "No scan with that ID.", http.StatusNotFound)
+		return
+	}
+	var old int64
+	if with := r.URL.Query().Get("with"); with != "" {
+		if old, err = strconv.ParseInt(with, 10, 64); err != nil || old < 1 {
+			http.Error(w, "with should be the ID of an older scan.", http.StatusBadRequest)
+			return
+		}
+	}
+	d, err := tools.Compare(h.Scans.Store, old, cur)
+	switch {
+	case errors.Is(err, tools.ErrNotFound):
+		http.Error(w, "No scan with that ID.", http.StatusNotFound)
+	case errors.Is(err, tools.ErrNoEarlierScan):
+		http.Error(w, "There's no earlier finished scan of the same targets and ports to compare with.", http.StatusNotFound)
+	case errors.Is(err, tools.ErrNoReport):
+		http.Error(w, "This scan has no report yet.", http.StatusConflict)
+	case err != nil:
+		http.Error(w, "Could not compare these scans.", http.StatusInternalServerError)
+	default:
+		writeJSON(w, http.StatusOK, d)
+	}
 }
 
 func (h *Handler) stopScan(w http.ResponseWriter, r *http.Request) {

@@ -38,6 +38,10 @@ const (
 	ExitOK    = 0 // everything worked (findings or not)
 	ExitError = 1 // the scan couldn't run
 	ExitUsage = 2 // the command was typed wrong
+
+	// ExitFindings is for --fail-on: the scan found something at or above
+	// that severity, so a CI job can fail on it.
+	ExitFindings = 3
 )
 
 // App holds what the CLI depends on.
@@ -133,6 +137,7 @@ func (a *App) scan(ctx context.Context, args []string) int {
 	force := fs.Bool("force", false, fmt.Sprintf("allow scanning more than %d addresses", target.DefaultLimit))
 	nmapPath := fs.String("nmap", "", "path to the nmap binary (default: nmap from PATH)")
 	noSave := fs.Bool("no-save", false, "don't save this scan to the history")
+	failOn := fs.String("fail-on", "", "exit with code 3 if there's a finding at or above this severity: critical, high, medium, low or info")
 	fs.Usage = func() {
 		fmt.Fprintln(a.Stderr, "Usage: nuqs scan [flags] <target>...")
 		fs.PrintDefaults()
@@ -158,6 +163,14 @@ func (a *App) scan(ctx context.Context, args []string) int {
 	if *workers < 1 || *timeout <= 0 {
 		fmt.Fprintln(a.Stderr, "--workers must be at least 1 and --timeout must be positive")
 		return ExitUsage
+	}
+	var failAt model.Severity
+	if *failOn != "" {
+		var err error
+		if failAt, err = model.ParseSeverity(*failOn); err != nil {
+			fmt.Fprintln(a.Stderr, "--fail-on should be critical, high, medium, low or info")
+			return ExitUsage
+		}
 	}
 	if len(specs) == 0 {
 		fmt.Fprintln(a.Stderr, "no targets given")
@@ -217,7 +230,24 @@ func (a *App) scan(ctx context.Context, args []string) int {
 	if ctx.Err() != nil {
 		return ExitError
 	}
+	if *failOn != "" {
+		if n := countAtLeast(rep, failAt); n > 0 {
+			fmt.Fprintf(a.Stderr, "Failing because of --fail-on %s: %d finding(s) at %s or above.\n", failAt, n, failAt)
+			return ExitFindings
+		}
+	}
 	return ExitOK
+}
+
+// countAtLeast counts the findings at or above a severity.
+func countAtLeast(rep *engine.Report, min model.Severity) int {
+	n := 0
+	for _, f := range rep.Findings {
+		if f.Severity >= min {
+			n++
+		}
+	}
+	return n
 }
 
 func (a *App) printReport(rep *engine.Report, asJSON bool) error {
@@ -395,7 +425,7 @@ func (a *App) diff(args []string) int {
 	for i, arg := range fs.Args() {
 		var err error
 		ids[i], err = strconv.ParseInt(arg, 10, 64)
-		bad = bad || err != nil
+		bad = bad || err != nil || ids[i] < 1
 	}
 	if bad {
 		fmt.Fprintln(a.Stderr, "Usage: nuqs diff [--json] <old> [new], the IDs are in nuqs history")
@@ -408,48 +438,22 @@ func (a *App) diff(args []string) int {
 	}
 	defer func() { _ = st.Close() }()
 
-	cur, err := st.Run(ids[len(ids)-1])
-	var old store.Run
-	switch {
-	case err != nil:
-	case len(ids) == 2:
-		old, err = st.Run(ids[0])
-	default:
-		old, err = st.Previous(cur.ID)
-		if errors.Is(err, store.ErrNotFound) {
-			fmt.Fprintf(a.Stderr, "Scan %d has no earlier finished scan of the same targets and ports. Pick one with: nuqs diff <old> %d\n", cur.ID, cur.ID)
-			return ExitError
-		}
+	cur, old := ids[len(ids)-1], int64(0)
+	if len(ids) == 2 {
+		old = ids[0]
+	}
+	d, err := tools.Compare(st, old, cur)
+	if errors.Is(err, tools.ErrNoEarlierScan) {
+		fmt.Fprintf(a.Stderr, "Scan %d has no earlier finished scan of the same targets and ports. Pick one with: nuqs diff <old> %d\n", cur, cur)
+		return ExitError
 	}
 	if err != nil {
 		fmt.Fprintln(a.Stderr, "error:", err)
 		return ExitError
 	}
-	for _, r := range []store.Run{old, cur} {
-		if r.Report == nil {
-			fmt.Fprintf(a.Stderr, "Scan %d %s without a report, so there's nothing to compare.\n", r.ID, r.Status)
-			return ExitError
-		}
-		if r.Status != store.Completed || r.Error != "" {
-			why := r.Status
-			if r.Error != "" {
-				why = r.Error
-			}
-			fmt.Fprintf(a.Stderr, "Note: scan %d didn't finish cleanly (%s), so it may have missed findings.\n", r.ID, why)
-		}
+	for _, note := range d.Notes {
+		fmt.Fprintf(a.Stderr, "Note: %s.\n", note)
 	}
-	if !store.SameScope(old, cur) {
-		fmt.Fprintln(a.Stderr, "Note: these scans didn't cover the same targets and ports, so some findings may show as new or fixed only because of that.")
-	}
-
-	d := diff.Compare(old.Report, cur.Report)
-	d.Old.ID, d.New.ID = old.ID, cur.ID
-	seen, err := st.Seen(d.IDs())
-	if err != nil {
-		fmt.Fprintln(a.Stderr, "error:", err)
-		return ExitError
-	}
-	d.SetSeen(func(id string) (time.Time, time.Time) { return seen[id].First, seen[id].Last })
 	if *asJSON {
 		err = output.DiffJSON(a.Stdout, d)
 	} else {
