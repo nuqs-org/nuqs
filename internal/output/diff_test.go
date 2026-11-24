@@ -41,6 +41,18 @@ func TestDiffText(t *testing.T) {
 	}
 }
 
+func TestDiffTextFixedSaysWhy(t *testing.T) {
+	newer := sample()
+	newer.Findings = nil
+	var b bytes.Buffer
+	if err := DiffText(&b, diff.Compare(sample(), newer)); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(b.String(), "Fixed (1):") || !strings.Contains(b.String(), "WHY") || !strings.Contains(b.String(), diff.CheckPassed) {
+		t.Errorf("fixed findings should say why:\n%s", b.String())
+	}
+}
+
 func TestDiffJSON(t *testing.T) {
 	var b bytes.Buffer
 	if err := DiffJSON(&b, diff.Compare(&engine.Report{}, sample())); err != nil {

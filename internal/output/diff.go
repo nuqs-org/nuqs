@@ -36,7 +36,7 @@ func DiffText(w io.Writer, d diff.Result) error {
 		extra func(diff.Item) string
 	}{
 		{"New", d.Added, "", nil},
-		{"Fixed", d.Fixed, "", nil},
+		{"Fixed", d.Fixed, "WHY", func(it diff.Item) string { return it.Reason }},
 		{"Still open", d.Open, "SINCE", func(it diff.Item) string {
 			if it.FirstSeen.IsZero() {
 				return ""

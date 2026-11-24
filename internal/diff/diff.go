@@ -1,7 +1,8 @@
 // Package diff compares two scan reports and sorts every finding into new,
 // fixed, still open, or not checked. A finding only counts as fixed when the
 // newer scan looked again and didn't find it: if the host didn't answer or
-// the check couldn't finish, it goes in "not checked" instead.
+// the check couldn't finish, it goes in "not checked" instead. A fixed
+// finding says why: its port is no longer open, or the check passed.
 package diff
 
 import (
@@ -15,8 +16,10 @@ import (
 	"github.com/nuqs-org/nuqs/internal/model"
 )
 
-// Why a finding from the older scan wasn't checked again.
+// Why a finding from the older scan is in Fixed or NotChecked.
 const (
+	PortClosed  = "port no longer open"
+	CheckPassed = "check no longer finds it"
 	HostDown    = "host didn't answer"
 	CheckFailed = "check couldn't finish"
 )
@@ -33,7 +36,7 @@ type Item struct {
 	model.Finding
 	FirstSeen time.Time `json:"first_seen,omitzero"` // the first saved scan that found it
 	LastSeen  time.Time `json:"last_seen,omitzero"`  // the last saved scan that found it
-	Reason    string    `json:"reason,omitempty"`    // why it's in NotChecked
+	Reason    string    `json:"reason,omitempty"`    // why it's in Fixed or NotChecked
 }
 
 // Result is what changed between two scans. Each list is sorted worst first.
@@ -70,8 +73,12 @@ func Compare(old, new *engine.Report) Result {
 	}
 
 	up := map[string]bool{}
+	open := map[string]bool{} // host|port/protocol of every service the newer scan found
 	for _, h := range new.Hosts {
 		up[h.Address] = true
+		for _, sv := range h.Services {
+			open[fmt.Sprintf("%s|%d/%s", h.Address, sv.Port, sv.Protocol)] = true
+		}
 	}
 	failed := map[string]bool{}
 	for _, e := range new.Errors {
@@ -84,8 +91,10 @@ func Compare(old, new *engine.Report) Result {
 			res.NotChecked = append(res.NotChecked, Item{Finding: f, Reason: HostDown})
 		case failed[fmt.Sprintf("%s|%s|%d", f.CheckID, f.Host, f.Port)]:
 			res.NotChecked = append(res.NotChecked, Item{Finding: f, Reason: CheckFailed})
+		case !open[fmt.Sprintf("%s|%d/%s", f.Host, f.Port, f.Protocol)]:
+			res.Fixed = append(res.Fixed, Item{Finding: f, Reason: PortClosed})
 		default:
-			res.Fixed = append(res.Fixed, Item{Finding: f})
+			res.Fixed = append(res.Fixed, Item{Finding: f, Reason: CheckPassed})
 		}
 	}
 	for _, list := range [][]Item{res.Added, res.Fixed, res.Open, res.NotChecked} {

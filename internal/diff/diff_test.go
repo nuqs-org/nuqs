@@ -84,6 +84,32 @@ func TestFailedCheckIsNotFixed(t *testing.T) {
 	}
 }
 
+// A finding is fixed when the host is still up and either its port closed or
+// the check ran again and passed. Stopping a service is a fix, so a missing
+// port must count as fixed, not as "not checked".
+func TestWhyFixed(t *testing.T) {
+	withPort := func(port int, protocol string) *engine.Report {
+		r := report(both)
+		r.Hosts[0].Services = []model.Service{{Port: port, Protocol: protocol, Name: "redis"}}
+		return r
+	}
+	cases := []struct {
+		name string
+		new  *engine.Report
+		want string
+	}{
+		{"redis stopped, host still up", report(both), PortClosed},
+		{"redis still running, check passed", withPort(6379, "tcp"), CheckPassed},
+		{"only the udp port is open", withPort(6379, "udp"), PortClosed},
+	}
+	for _, c := range cases {
+		d := Compare(report(both, redis), c.new)
+		if len(d.Fixed) != 1 || len(d.NotChecked) != 0 || d.Fixed[0].Reason != c.want {
+			t.Errorf("%s: fixed %+v, not checked %+v, want fixed because %q", c.name, d.Fixed, d.NotChecked, c.want)
+		}
+	}
+}
+
 func TestWorstFirst(t *testing.T) {
 	crit := finding("x", "10.0.0.2", 1, model.Critical)
 	low := finding("y", "10.0.0.1", 1, model.Low)

@@ -62,7 +62,7 @@ func TestSinceLastScanAndDiff(t *testing.T) {
 		t.Fatalf("diff exit %d:\n%s", code, errOut)
 	}
 	for _, want := range []string{"Comparing scan 2 (", "with scan 4 (", "Targets: 192.168.1.0/30", "0 new, 1 fixed, 0 still open",
-		"Fixed (1):", "MEDIUM", "192.168.1.1", "23/tcp", "telnet-open"} {
+		"Fixed (1):", "MEDIUM", "192.168.1.1", "23/tcp", "telnet-open", "port no longer open"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("diff is missing %q:\n%s", want, out)
 		}
