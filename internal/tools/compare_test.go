@@ -51,6 +51,12 @@ func TestCompare(t *testing.T) {
 		t.Fatalf("compare with the last scan: %v %+v", err, d)
 	}
 
+	for _, old := range []int64{second, second + 1} {
+		if _, err := Compare(st, old, second); !errors.Is(err, ErrNotOlder) {
+			t.Errorf("old %d against %d should be refused: %v", old, second, err)
+		}
+	}
+
 	stopped := saveRun(t, st, store.Stopped, `{"ports":"22"}`, true)
 	d, err = Compare(st, first, stopped)
 	if err != nil || len(d.Notes) != 2 || !strings.Contains(d.Notes[0], "didn't finish cleanly (stopped)") ||
@@ -59,10 +65,12 @@ func TestCompare(t *testing.T) {
 	}
 
 	running := saveRun(t, st, store.Running, "{}", false)
-	if _, err := Compare(st, first, running); !errors.Is(err, ErrNoReport) {
-		t.Errorf("a running scan has no report: %v", err)
+	for _, old := range []int64{0, first} {
+		if _, err := Compare(st, old, running); !errors.Is(err, ErrNoReport) {
+			t.Errorf("a running scan has no report (old %d): %v", old, err)
+		}
 	}
-	for _, ids := range [][2]int64{{0, 99}, {99, second}} {
+	for _, ids := range [][2]int64{{0, 99}, {first, 99}} {
 		if _, err := Compare(st, ids[0], ids[1]); !errors.Is(err, ErrNotFound) {
 			t.Errorf("%v: %v", ids, err)
 		}

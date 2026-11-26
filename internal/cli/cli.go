@@ -443,6 +443,10 @@ func (a *App) diff(args []string) int {
 		old = ids[0]
 	}
 	d, err := tools.Compare(st, old, cur)
+	if errors.Is(err, tools.ErrNotOlder) {
+		fmt.Fprintf(a.Stderr, "The first ID should be the older scan, like: nuqs diff %d %d\n", cur, old)
+		return ExitUsage
+	}
 	if errors.Is(err, tools.ErrNoEarlierScan) {
 		fmt.Fprintf(a.Stderr, "Scan %d has no earlier finished scan of the same targets and ports. Pick one with: nuqs diff <old> %d\n", cur, cur)
 		return ExitError

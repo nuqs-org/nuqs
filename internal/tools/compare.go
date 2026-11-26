@@ -15,17 +15,25 @@ import (
 var (
 	ErrNoEarlierScan = errors.New("there's no earlier finished scan of the same targets and ports")
 	ErrNoReport      = errors.New("there's no report to compare")
+	ErrNotOlder      = errors.New("the scan to compare with has to be older")
 )
 
 // Compare says what changed from the saved scan old to the saved scan cur.
 // With old 0 it picks the last clean scan of the same targets and ports.
 // The result's Notes say when the comparison is less certain, like two scans
-// of different ports. A scan that isn't saved gives ErrNotFound.
+// of different ports. A scan that isn't saved gives ErrNotFound, and an old
+// scan that isn't older than cur gives ErrNotOlder, so new and fixed never
+// come out the wrong way round.
 func Compare(st *store.Store, old, cur int64) (diff.Result, error) {
+	if old != 0 && old >= cur {
+		return diff.Result{}, ErrNotOlder
+	}
 	newer, err := st.Run(cur)
 	var older store.Run
 	switch {
 	case err != nil:
+	case newer.Report == nil:
+		return diff.Result{}, fmt.Errorf("scan %d %s without a report: %w", newer.ID, newer.Status, ErrNoReport)
 	case old == 0:
 		older, err = st.Previous(cur)
 		if errors.Is(err, store.ErrNotFound) {

@@ -65,8 +65,10 @@ func TestDiffScan(t *testing.T) {
 	}{
 		{"/api/scans/" + second + "/diff?with=x", http.StatusBadRequest},
 		{"/api/scans/" + second + "/diff?with=0", http.StatusBadRequest},
+		{"/api/scans/" + second + "/diff?with=" + second, http.StatusBadRequest},
+		{"/api/scans/" + first + "/diff?with=" + second, http.StatusBadRequest},
 		{"/api/scans/9/diff", http.StatusNotFound},
-		{"/api/scans/" + second + "/diff?with=9", http.StatusNotFound},
+		{"/api/scans/9/diff?with=" + second, http.StatusNotFound},
 		{"/api/scans/abc/diff", http.StatusNotFound},
 	}
 	for _, c := range cases {
@@ -89,7 +91,7 @@ func TestDiffScanRunningAndUnsaved(t *testing.T) {
 	if w := do(h, http.MethodPost, "/api/scans", `{"kind":"full","settings":{"target":"127.0.0.1"}}`); w.Code != http.StatusCreated {
 		t.Fatalf("start: %d %s", w.Code, w.Body)
 	}
-	if w := do(h, http.MethodGet, "/api/scans/1/diff?with=1", ""); w.Code != http.StatusConflict {
+	if w := do(h, http.MethodGet, "/api/scans/1/diff", ""); w.Code != http.StatusConflict {
 		t.Errorf("running scan: %d %s", w.Code, w.Body)
 	}
 	close(slow.release)

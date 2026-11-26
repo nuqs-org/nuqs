@@ -190,6 +190,8 @@ func (h *Handler) diffScan(w http.ResponseWriter, r *http.Request) {
 	}
 	d, err := tools.Compare(h.Scans.Store, old, cur)
 	switch {
+	case errors.Is(err, tools.ErrNotOlder):
+		http.Error(w, "with should be the ID of an older scan.", http.StatusBadRequest)
 	case errors.Is(err, tools.ErrNotFound):
 		http.Error(w, "No scan with that ID.", http.StatusNotFound)
 	case errors.Is(err, tools.ErrNoEarlierScan):

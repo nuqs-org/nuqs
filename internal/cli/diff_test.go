@@ -6,12 +6,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/nuqs-org/nuqs/checks/telnet"
+	"github.com/nuqs-org/nuqs/internal/check"
 	"github.com/nuqs-org/nuqs/internal/diff"
+	"github.com/nuqs-org/nuqs/internal/model"
 )
 
 // withoutTelnet is the router scan after telnet was turned off.
@@ -115,6 +119,12 @@ func TestDiffErrors(t *testing.T) {
 	if code := app.Run(ctx, []string{"diff", "1", "9"}); code != ExitError {
 		t.Errorf("unknown second scan: exit %d", code)
 	}
+	for _, args := range [][]string{{"diff", "9", "1"}, {"diff", "1", "1"}} {
+		errOut.Reset()
+		if code := app.Run(ctx, args); code != ExitUsage || !strings.Contains(errOut.String(), "first ID should be the older scan") {
+			t.Errorf("%v: exit %d, want usage\n%s", args, code, errOut)
+		}
+	}
 }
 
 func TestFailOn(t *testing.T) {
@@ -146,5 +156,60 @@ func TestFailOn(t *testing.T) {
 	}
 	if code := app.Run(ctx, []string{"diff", "0", "1"}); code != ExitUsage {
 		t.Errorf("scan IDs start at 1: exit %d", code)
+	}
+}
+
+// brokenCheck always fails, like a check that couldn't reach the service.
+type brokenCheck struct{}
+
+func (brokenCheck) Info() check.Info { return testInfo("broken") }
+
+// testInfo copies the telnet check's info, so it always passes check.Validate,
+// with a new ID and critical severity.
+func testInfo(id string) check.Info {
+	in := telnet.Check{}.Info()
+	in.ID, in.Severity, in.RemediationTitle = id, model.Critical, ""
+	return in
+}
+
+func (brokenCheck) Run(context.Context, check.Target) (*check.Result, error) {
+	return nil, errors.New("connection refused")
+}
+
+// stopCheck stops the scan while it runs, like Ctrl+C, and still finds something.
+type stopCheck struct{ stop context.CancelFunc }
+
+func (stopCheck) Info() check.Info { return testInfo("stops") }
+
+func (c stopCheck) Run(context.Context, check.Target) (*check.Result, error) {
+	c.stop()
+	return &check.Result{Evidence: "stopped"}, nil
+}
+
+// TestFailOnPrecedence pins which exit code wins when a scan has findings and errors.
+func TestFailOnPrecedence(t *testing.T) {
+	args := []string{"scan", "--no-save", "192.168.1.0/30", "-p", "23"}
+
+	// Check errors don't change the code: telnet (medium) still trips medium,
+	// and nothing trips critical, because the broken check found nothing.
+	app, _, errOut := newApp(t, &fakeRunner{})
+	app.Checks = func() []check.Check { return []check.Check{telnet.Check{}, brokenCheck{}} }
+	for level, want := range map[string]int{"medium": ExitFindings, "critical": ExitOK} {
+		errOut.Reset()
+		if code := app.Run(context.Background(), append(args, "--fail-on", level)); code != want {
+			t.Errorf("check error with --fail-on %s: exit %d, want %d\n%s", level, code, want, errOut)
+		}
+	}
+
+	// A stopped scan exits with 1 even when --fail-on would match.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	app, _, errOut = newApp(t, &fakeRunner{})
+	app.Checks = func() []check.Check { return []check.Check{telnet.Check{}, stopCheck{stop: cancel}} }
+	if code := app.Run(ctx, append(args, "--fail-on", "info")); code != ExitError {
+		t.Errorf("stopped scan with --fail-on: exit %d, want %d\n%s", code, ExitError, errOut)
+	}
+	if !strings.Contains(errOut.String(), "stopped early") || strings.Contains(errOut.String(), "Failing because of --fail-on") {
+		t.Errorf("a stopped scan shouldn't blame --fail-on:\n%s", errOut)
 	}
 }

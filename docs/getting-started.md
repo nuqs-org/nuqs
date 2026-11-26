@@ -82,7 +82,7 @@ Since scan 11 (2026-11-24 10:02): 1 new, 2 fixed, 5 still open. See what changed
 ./nuqs diff 9 12      # any two scans, older one first, add --json for JSON
 ```
 
-The web server has the same comparison as JSON at `GET /api/scans/12/diff`, or `GET /api/scans/12/diff?with=9` for two scans you pick.
+The web server has the same comparison as JSON at `GET /api/scans/12/diff`, or `GET /api/scans/12/diff?with=9` for two scans you pick. `with` has to be the older scan.
 
 Findings are matched by check, host and port. A finding only counts as **fixed** when the newer scan looked again and didn't find it, and it says why: the port is no longer open, or the check no longer finds it. If the host didn't answer or the check couldn't finish, it's listed as **not checked** instead. Scans that stopped early aren't used for the automatic comparison, because everything they missed would look fixed.
 
@@ -96,6 +96,8 @@ Scans are saved in one file, `nuqs.db`, in `~/Library/Application Support/nuqs` 
 | 1 | Scan couldn't run, or was stopped |
 | 2 | The command was typed wrong |
 | 3 | `--fail-on` was set and the scan found something at or above that severity |
+
+A stopped scan always exits with 1, even when `--fail-on` matched. Checks that couldn't finish don't change the code, so a scan with check errors and no findings at that level still exits with 0. The errors are listed in the report.
 
 To fail a CI job on serious findings:
 
