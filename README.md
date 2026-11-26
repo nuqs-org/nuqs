@@ -58,11 +58,12 @@ The full map (diagram plus every file) is on the [website](https://nuqs-org.gith
 ## Develop
 
 ```bash
-go test -race ./...                                  # unit tests
-go test -tags integration ./test/integration         # needs nmap
-golangci-lint run                                    # lint, also checks every public thing has a doc comment
-go run ./tools/archdiagram                           # build the architecture page locally (the docs build does this too)
-./scripts/docs.sh                                    # docs website at http://127.0.0.1:8000 (installs what it needs)
+make build          # build the nuqs binary
+make test           # unit tests with -race and >= 85% coverage
+make lint           # golangci-lint (including doc comments)
+make integration    # real-Nmap integration test
+make docs-serve     # docs website at http://127.0.0.1:8000 (make docs to build strictly)
+make lab            # Docker loopback lab against lab/expected-report.json
 ```
 
 Adding a check? See [Writing a check](docs/writing-a-check.md). Everything else: [Contributing](docs/contributing.md). Found a security bug? See [Security](SECURITY.md).

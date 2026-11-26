@@ -6,12 +6,25 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Pick Python and the right venv bin folder (Unix uses bin/, Windows uses Scripts/).
+python_bin=python3
+if ! "$python_bin" --version >/dev/null 2>&1; then
+  python_bin=python
+fi
+venv_bin=.venv/bin
+if [ -d .venv/Scripts ]; then
+  venv_bin=.venv/Scripts
+fi
+
 # Install (or update) the docs tools when requirements.txt is new or changed.
 if [ ! -f .venv/.installed ] || [ docs/requirements.txt -nt .venv/.installed ]; then
   echo "Installing docs tools into .venv (only needed once)..."
-  python3 -m venv .venv
-  .venv/bin/pip install --quiet --upgrade pip
-  .venv/bin/pip install --quiet -r docs/requirements.txt
+  "$python_bin" -m venv .venv
+  if [ -d .venv/Scripts ]; then
+    venv_bin=.venv/Scripts
+  fi
+  "$venv_bin/pip" install --quiet --upgrade pip
+  "$venv_bin/pip" install --quiet -r docs/requirements.txt
   touch .venv/.installed
 fi
 
@@ -19,7 +32,7 @@ go run ./tools/apidocs
 go run ./tools/archdiagram
 
 if [ "${1:-serve}" = "build" ]; then
-  .venv/bin/mkdocs build --strict
+  "$venv_bin/mkdocs" build --strict
 else
-  .venv/bin/mkdocs serve
+  "$venv_bin/mkdocs" serve
 fi

@@ -25,7 +25,7 @@ func withoutTelnet(t *testing.T) []byte {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fixed := regexp.MustCompile(`<port protocol="tcp" portid="23">.*</port>\n`).ReplaceAll(xml, nil)
+	fixed := regexp.MustCompile(`<port protocol="tcp" portid="23">.*</port>\r?\n`).ReplaceAll(xml, nil)
 	if bytes.Equal(fixed, xml) {
 		t.Fatal("testdata/router.xml has no telnet port to remove")
 	}

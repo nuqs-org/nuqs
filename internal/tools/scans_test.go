@@ -68,8 +68,8 @@ func TestScanRunsInBackground(t *testing.T) {
 	if done.HostsFound != 1 || done.ChecksTotal != 1 || done.ChecksDone != 1 || done.Phase != "" || done.Percent != 100 || done.Remaining != "" {
 		t.Errorf("progress not tracked: %+v", done)
 	}
-	if done.Elapsed() <= 0 || done.Elapsed() > 5*time.Second {
-		t.Errorf("elapsed %v", done.Elapsed())
+	if done.Finished.IsZero() || done.Elapsed() < 0 || done.Elapsed() > 5*time.Second {
+		t.Errorf("elapsed %v (finished %v)", done.Elapsed(), done.Finished)
 	}
 }
 

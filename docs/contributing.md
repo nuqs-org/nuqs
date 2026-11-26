@@ -5,9 +5,24 @@
 1. Pick a task from the [roadmap](roadmap.md) and open an issue (or comment on one) so nobody does it twice.
 2. Make a branch from `master`, like `feat/redis-check` or `fix/ftp-timeout`.
 3. Write the code **and** the tests **and** the doc comments.
-4. Run `go test -race ./...` and `golangci-lint run` before pushing.
+4. Run `make test` and `make lint` before pushing. CI runs the same targets.
 5. Open a PR. Keep it small, one thing per PR. Fill in the **test plan**: what to run and what the reviewer should see.
 6. One teammate reviews it by following the test plan. CI must be green before merging.
+
+## Common commands
+
+The `Makefile` holds the commands used both locally and in CI. Run `make` (or `make help`) to see the full list.
+
+| Command | What it does |
+|---|---|
+| `make build` | Build the `nuqs` binary (`nuqs.exe` on Windows) |
+| `make test` | Run unit tests with `-race` and check total coverage is at least 85% |
+| `make lint` | Run `golangci-lint` (including doc comment checks) |
+| `make docs` | Build the docs site strictly into `site/` (use `make docs-serve` for live preview) |
+| `make lab` | Run the Docker loopback lab and compare against `lab/expected-report.json` |
+| `make integration` | Run the real-Nmap integration test |
+
+On Windows, `make build`, `make test`, `make vet`, `make lint` and `make clean` work in both Git Bash / MSYS2 and native PowerShell or CMD (with `mingw32-make`). `make docs` and `make lab` need Bash (Git Bash, MSYS2 or WSL).
 
 ## Keep it simple
 

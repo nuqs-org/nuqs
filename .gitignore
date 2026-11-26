@@ -2,6 +2,7 @@
 
 # Build output
 /nuqs
+/nuqs.exe
 /dist/
 *.test
 *.out
