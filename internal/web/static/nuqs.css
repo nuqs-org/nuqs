@@ -156,6 +156,8 @@ table.list {width:100%;border-collapse:collapse}
 .warnCard p {color:var(--sub);font-size:13px}
 .errorList {margin:0;padding-left:18px;font-size:13px;display:grid;gap:4px;overflow-wrap:anywhere}
 .formError {padding:10px 14px;border-radius:9px;background:color-mix(in srgb,var(--critical) 14%,transparent);color:var(--critical)}
+.checkFilters {display:flex;align-items:end;gap:10px;flex-wrap:wrap}
+.checkFilters .filter {display:grid;gap:4px;color:var(--sub);font-size:12px}
 
 /* Results tabs, a segmented control like Finder's view switcher. */
 .segmented {display:inline-flex;gap:2px;padding:2px;border-radius:8px;background:var(--selected);width:fit-content}

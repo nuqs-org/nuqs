@@ -2,10 +2,22 @@
 {{define "content"}}
 <section class="page">
   <div class="pageHead"><h1>Check library</h1><p>Every check in this version of Nuqs. Click a card for full details, fix and sources.</p></div>
+  <div class="checkFilters">
   <label class="searchLabel">
     <span class="visuallyHidden">Search checks</span>
-    <input type="search" id="checkSearch" name="q" hx-get="/partials/checks" hx-trigger="input changed delay:150ms, search" hx-target="#catalog" hx-swap="innerHTML" placeholder="Search by name, description, service, port or severity">
+    <input type="search" id="checkSearch" name="q" hx-get="/partials/checks" hx-trigger="input changed delay:150ms, search" hx-include="#checkSeverity" hx-target="#catalog" hx-swap="innerHTML" placeholder="Search by name, description, service, port or severity">
   </label>
-  <div id="catalog" class="checkGrid" aria-live="polite">{{template "checks_library.html" .Data}}</div>
+  <label class="filter"><span>Severity</span>
+    <select id="checkSeverity" name="severity" hx-get="/partials/checks" hx-trigger="change" hx-include="#checkSearch" hx-target="#catalog" hx-swap="innerHTML">
+      <option value=""{{if not .Data.Severity}} selected{{end}}>All</option>
+      <option value="critical"{{if eq .Data.Severity "critical"}} selected{{end}}>Critical</option>
+      <option value="high"{{if eq .Data.Severity "high"}} selected{{end}}>High</option>
+      <option value="medium"{{if eq .Data.Severity "medium"}} selected{{end}}>Medium</option>
+      <option value="low"{{if eq .Data.Severity "low"}} selected{{end}}>Low</option>
+      <option value="info"{{if eq .Data.Severity "info"}} selected{{end}}>Info</option>
+    </select>
+  </label>
+  </div>
+  <div id="catalog" class="checkGrid" aria-live="polite">{{template "checks_library.html" .Data.Checks}}</div>
 </section>
 {{end}}

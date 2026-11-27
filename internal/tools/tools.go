@@ -127,14 +127,22 @@ func (s *Service) CheckByID(id string) (CheckInfo, bool) {
 
 // FilterChecks returns checks matching query across title, description, ID, severity, services and ports.
 func (s *Service) FilterChecks(query string) []CheckInfo {
+	return s.FilterChecksWithSeverity(query, "")
+}
+
+// FilterChecksWithSeverity returns checks matching query and, when set, severity.
+func (s *Service) FilterChecksWithSeverity(query, severity string) []CheckInfo {
 	items := s.ListChecks()
 	term := strings.ToLower(strings.TrimSpace(query))
+	severity = strings.ToLower(strings.TrimSpace(severity))
 	if term == "" {
-		return items
+		if severity == "" {
+			return items
+		}
 	}
 	matched := make([]CheckInfo, 0, len(items))
 	for _, item := range items {
-		if checkMatches(item, term) {
+		if (term == "" || checkMatches(item, term)) && (severity == "" || strings.EqualFold(item.Severity, severity)) {
 			matched = append(matched, item)
 		}
 	}

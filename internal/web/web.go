@@ -198,6 +198,11 @@ type page struct {
 	Data         any
 }
 
+type checksLibrary struct {
+	Checks   []tools.CheckInfo
+	Severity string
+}
+
 func (h *Handler) render(w http.ResponseWriter, r *http.Request, name string, p page) {
 	h.renderStatus(w, r, http.StatusOK, name, p)
 }
@@ -856,7 +861,8 @@ func (h *Handler) findingPage(w http.ResponseWriter, r *http.Request) {
 // --- Check library ---
 
 func (h *Handler) checksPage(w http.ResponseWriter, r *http.Request) {
-	h.render(w, r, "checks.html", page{Title: "Check library", Nav: "checks", Crumbs: []crumb{{Label: "Check library"}}, Data: h.Service.ListChecks()})
+	severity := r.URL.Query().Get("severity")
+	h.render(w, r, "checks.html", page{Title: "Check library", Nav: "checks", Crumbs: []crumb{{Label: "Check library"}}, Data: checksLibrary{Checks: h.Service.FilterChecksWithSeverity(r.URL.Query().Get("q"), severity), Severity: severity}})
 }
 
 func (h *Handler) checkPage(w http.ResponseWriter, r *http.Request) {
@@ -875,7 +881,7 @@ func (h *Handler) checkPage(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) checksPartial(w http.ResponseWriter, r *http.Request) {
 	var buf bytes.Buffer
-	if err := h.parts.ExecuteTemplate(&buf, "checks_library.html", h.Service.FilterChecks(r.URL.Query().Get("q"))); err != nil {
+	if err := h.parts.ExecuteTemplate(&buf, "checks_library.html", h.Service.FilterChecksWithSeverity(r.URL.Query().Get("q"), r.URL.Query().Get("severity"))); err != nil {
 		http.Error(w, "template error", http.StatusInternalServerError)
 		return
 	}

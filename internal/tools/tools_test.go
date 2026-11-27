@@ -93,6 +93,9 @@ func TestListFilterAndStatus(t *testing.T) {
 	if len(svc.FilterChecks("medium")) != 1 {
 		t.Fatal("filter by severity should match telnet")
 	}
+	if got := svc.FilterChecksWithSeverity("", "high"); len(got) != 1 || got[0].ID != "redis-no-auth" {
+		t.Fatalf("filter by severity = %+v", got)
+	}
 	if len(svc.FilterChecks("nonexistent")) != 0 {
 		t.Fatal("filter should return zero matches for unknown query")
 	}

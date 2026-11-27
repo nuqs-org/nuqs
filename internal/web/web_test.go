@@ -178,6 +178,10 @@ func TestEmptyPages(t *testing.T) {
 	}
 	_, body = get(t, h, "/partials/checks?q=nothing-like-this")
 	mustContain(t, "empty search", body, "No matching checks.")
+	_, body = get(t, h, "/partials/checks?severity=medium")
+	if !strings.Contains(body, "telnet-open") || strings.Contains(body, "ftp-anonymous-login") {
+		t.Errorf("severity filter didn't filter: %s", body)
+	}
 
 	code, body = get(t, h, "/checks/telnet-open")
 	if code != http.StatusOK {
