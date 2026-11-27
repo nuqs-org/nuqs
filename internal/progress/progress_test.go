@@ -3,6 +3,7 @@
 package progress
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -108,6 +109,21 @@ func TestNoChecksMeansChecksAreDone(t *testing.T) {
 	tr.Add(engine.Event{Kind: engine.ChecksStarted, Count: 0}, t0.Add(time.Second))
 	if tr.Percent() != 99 || tr.Step() != "Running checks" {
 		t.Errorf("no checks to run: %.1f %q", tr.Percent(), tr.Step())
+	}
+}
+
+func TestChecksStartedKeepsNmapProgressAndUsesCumulativeTotal(t *testing.T) {
+	tr := New(t0)
+	tr.Add(nmapAt("Service scan", 50), t0)
+	before := tr.Percent()
+	tr.Add(engine.Event{Kind: engine.ChecksStarted, Count: 2}, t0)
+	if tr.Percent() < before || tr.Percent()-before > 0.01 {
+		t.Fatalf("first host changed progress incorrectly: before %.1f after %.1f", before, tr.Percent())
+	}
+	tr.Add(engine.Event{Kind: engine.CheckDone}, t0)
+	tr.Add(engine.Event{Kind: engine.ChecksStarted, Count: 5}, t0)
+	if !strings.Contains(tr.Step(), "1 of 5 done") {
+		t.Fatalf("step = %q, want cumulative total", tr.Step())
 	}
 }
 

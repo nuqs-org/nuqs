@@ -96,7 +96,6 @@ func (t *Tracker) Add(ev engine.Event, now time.Time) {
 		t.nmap = 1
 		t.step = "Found " + plural(ev.Count, "live host", "live hosts")
 	case engine.ChecksStarted:
-		t.nmap = 1
 		t.checking = true
 		t.checksTotal = ev.Count
 		t.step = "Running checks"

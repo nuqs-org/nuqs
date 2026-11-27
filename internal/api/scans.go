@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/nuqs-org/nuqs/internal/auth"
+	"github.com/nuqs-org/nuqs/internal/model"
 	"github.com/nuqs-org/nuqs/internal/output"
 	"github.com/nuqs-org/nuqs/internal/tools"
 )
@@ -32,6 +33,10 @@ type Progress struct {
 	Percent     float64          `json:"percent"`             // the whole scan, 0 to 100, never goes down
 	Remaining   string           `json:"remaining,omitempty"` // like "about 40s left"
 	HostsFound  int              `json:"hosts_found"`
+	Hosts       []model.Host     `json:"hosts,omitempty"`       // hosts discovered so far
+	Findings    int              `json:"findings"`              // findings recorded so far
+	LatestHost  string           `json:"latest_host,omitempty"` // most recently discovered host
+	LatestOpen  int              `json:"latest_open"`           // open services on LatestHost
 	ChecksDone  int              `json:"checks_done"`
 	ChecksTotal int              `json:"checks_total"`
 	Seconds     float64          `json:"seconds"` // how long it has run
@@ -246,17 +251,25 @@ func (h *Handler) scanEvents(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			return
 		}
-		data, _ := json.Marshal(Progress{
+		progress := Progress{
 			Status:      s.Status,
 			Phase:       s.Phase,
 			Percent:     s.Percent,
 			Remaining:   s.Remaining,
 			HostsFound:  s.HostsFound,
+			Hosts:       reportHosts(s),
+			Findings:    reportFindingCount(s),
 			ChecksDone:  s.ChecksDone,
 			ChecksTotal: s.ChecksTotal,
 			Seconds:     s.Elapsed().Seconds(),
 			Error:       s.Error,
-		})
+		}
+		if len(progress.Hosts) > 0 {
+			last := progress.Hosts[len(progress.Hosts)-1]
+			progress.LatestHost = last.Address
+			progress.LatestOpen = len(last.Services)
+		}
+		data, _ := json.Marshal(progress)
 		if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
 			return
 		}
@@ -274,6 +287,20 @@ func (h *Handler) scanEvents(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+func reportHosts(s tools.Scan) []model.Host {
+	if s.Report == nil {
+		return nil
+	}
+	return s.Report.Hosts
+}
+
+func reportFindingCount(s tools.Scan) int {
+	if s.Report == nil {
+		return 0
+	}
+	return len(s.Report.Findings)
 }
 
 // LocalOnly refuses requests whose Host isn't this server, like

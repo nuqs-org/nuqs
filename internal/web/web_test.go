@@ -426,7 +426,7 @@ func TestRunningAndFailedScan(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	_, body = get(t, h, "/scans/"+s.ID)
-	mustContain(t, "stopped scan", body, "Stopped after", "Stopped before Nmap finished")
+	mustContain(t, "stopped scan", body, "Stopped after", "Stopped before any host was discovered")
 
 	h2 := newTestWeb(t, &fakeRunner{err: errors.New(`exec: "nmap": executable file not found in $PATH`)})
 	failed := startAndWait(t, h2, "")

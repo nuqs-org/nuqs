@@ -340,6 +340,13 @@ func (s nmapScanner) ScanWithProgress(ctx context.Context, targets []string, pro
 	return hosts, nil
 }
 
+// StreamScan runs Nmap and forwards hosts and progress as they arrive.
+func (s nmapScanner) StreamScan(ctx context.Context, targets []string, host func(model.Host), progress func(engine.ScannerProgress)) error {
+	return s.Stream(ctx, targets, nmap.Events{Host: host, Progress: func(p nmap.Progress) {
+		progress(engine.ScannerProgress{Task: p.Task, Percent: p.Percent, Remaining: p.Remaining})
+	}})
+}
+
 // NmapInstallHint returns an OS-appropriate instruction for installing Nmap.
 func NmapInstallHint() string {
 	return nmapInstallHintFor(runtime.GOOS)

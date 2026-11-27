@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/nuqs-org/nuqs/internal/diff"
 	"github.com/nuqs-org/nuqs/internal/engine"
+	"github.com/nuqs-org/nuqs/internal/model"
 	"github.com/nuqs-org/nuqs/internal/progress"
 	"github.com/nuqs-org/nuqs/internal/store"
 )
@@ -120,6 +122,14 @@ type entry struct {
 // time left counts down between updates. Callers hold m.mu.
 func (e *entry) snapshot() Scan {
 	s := e.scan
+	if e.scan.Report != nil && e.scan.Status == ScanRunning {
+		report := *e.scan.Report
+		report.Targets = slices.Clone(e.scan.Report.Targets)
+		report.Hosts = slices.Clone(e.scan.Report.Hosts)
+		report.Findings = slices.Clone(e.scan.Report.Findings)
+		report.Errors = slices.Clone(e.scan.Report.Errors)
+		s.Report = &report
+	}
 	if s.Status == ScanRunning {
 		now := time.Now()
 		s.Percent = e.tracker.Percent()
@@ -224,6 +234,12 @@ func (m *Scans) run(ctx context.Context, e *entry, valid ValidatedScan) {
 		m.update(e, func(s *Scan) {
 			e.tracker.Add(ev, time.Now())
 			switch ev.Kind {
+			case engine.HostFound:
+				if s.Report == nil {
+					s.Report = &engine.Report{Targets: s.Targets, Started: s.Started, Hosts: []model.Host{}, Findings: []model.Finding{}, Errors: []engine.CheckError{}}
+				}
+				s.Report.Hosts = append(s.Report.Hosts, ev.Discovered)
+				s.HostsFound = len(s.Report.Hosts)
 			case engine.DiscoveryDone:
 				s.HostsFound = ev.Count
 			case engine.ChecksStarted:
@@ -233,6 +249,10 @@ func (m *Scans) run(ctx context.Context, e *entry, valid ValidatedScan) {
 			}
 		})
 	})
+	if ctx.Err() != nil && (rep == nil || len(rep.Hosts) == 0) {
+		// A stop before discovery produced no useful partial report.
+		rep = nil
+	}
 	// Work out how it ended once, save that, then show it. Saving first
 	// means anyone who sees the scan finish can also find it in the store,
 	// and the store and the page can't disagree. No events come after

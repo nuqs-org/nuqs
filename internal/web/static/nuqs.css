@@ -147,6 +147,10 @@ table.list {width:100%;border-collapse:collapse}
 .progressCard {grid-template-columns:auto 1fr;align-items:center;gap:16px}
 .phase {font-weight:600}
 .progressNumbers {color:var(--sub);font-size:13px}
+.liveActivity {margin:8px 0 0;font-size:13px;font-weight:600}
+.liveStats {margin:4px 0 0;color:var(--sub);font-size:12px}
+.liveHosts {display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.liveHost {padding:4px 8px;border:1px solid var(--rule);border-radius:6px;font-size:12px;color:var(--sub)}
 .progressBar {height:6px;border-radius:3px;background:var(--rule);overflow:hidden;margin:8px 0 6px}
 .progressBar i {display:block;height:100%;background:var(--accent);transition:width .8s ease-out}
 .spinner {width:22px;height:22px;border-radius:50%;border:2.5px solid var(--rule);border-top-color:var(--accent);animation:spin .8s linear infinite}

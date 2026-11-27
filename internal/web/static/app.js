@@ -335,7 +335,29 @@ if (form) {
 const watched = document.querySelector("[data-watch]");
 if (watched) {
   const id = watched.dataset.watch;
+  const setLive = (elementId, text) => { if (byId(elementId)) byId(elementId).textContent = text; };
   const events = new EventSource("/api/scans/" + encodeURIComponent(id) + "/events");
+  let shownPercent = Number(byId("progressBar")?.getAttribute("aria-valuenow")) || 0;
+  let targetPercent = shownPercent;
+  let progressFrame = 0;
+  const animateProgress = () => {
+    const delta = targetPercent - shownPercent;
+    if (Math.abs(delta) < 0.1) {
+      shownPercent = targetPercent;
+      progressFrame = 0;
+    } else {
+      shownPercent += delta * 0.08;
+      progressFrame = requestAnimationFrame(animateProgress);
+    }
+    const displayed = Math.floor(shownPercent);
+    setLive("percentText", displayed + "%");
+    if (byId("progressFill")) byId("progressFill").style.width = shownPercent + "%";
+    if (byId("progressBar")) byId("progressBar").setAttribute("aria-valuenow", String(displayed));
+  };
+  const setTargetProgress = percent => {
+    targetPercent = Math.max(shownPercent, Math.min(100, Number(percent) || 0));
+    if (!progressFrame) progressFrame = requestAnimationFrame(animateProgress);
+  };
   events.onmessage = message => {
     const p = JSON.parse(message.data);
     if (p.status !== "running") {
@@ -345,16 +367,26 @@ if (watched) {
     }
     // The server works out percent and time left the same way the CLI does,
     // the page only shows them.
+    setTargetProgress(p.percent);
     const percent = Math.floor(p.percent) + "%";
     const set = (elementId, text) => { if (byId(elementId)) byId(elementId).textContent = text; };
     set("statusLabel", "Scanning · " + percent);
     set("phase", p.phase || "Working");
-    set("percentText", percent);
+    const latest = p.latest_host ? "Found " + p.latest_host + " · " + p.latest_open + (p.latest_open === 1 ? " open service" : " open services") : (p.phase || "Working");
+    set("liveActivity", latest);
     set("remaining", p.remaining || "working out the time left");
     set("elapsed", elapsed(p.seconds));
-    if (byId("progressFill")) {
-      byId("progressFill").style.width = p.percent + "%";
-      byId("progressBar").setAttribute("aria-valuenow", String(Math.floor(p.percent)));
+    set("hostsFound", p.hosts_found + (p.hosts_found === 1 ? " host found" : " hosts found"));
+    set("liveChecks", p.checks_done + " checks complete" + (p.checks_total ? " of " + p.checks_total : ""));
+    set("liveFindings", p.findings + (p.findings === 1 ? " finding" : " findings"));
+    const liveHosts = byId("liveHosts");
+    if (liveHosts && Array.isArray(p.hosts)) {
+      liveHosts.replaceChildren(...p.hosts.map(host => {
+        const item = document.createElement("span");
+        item.className = "liveHost mono";
+        item.textContent = host.address + " · " + host.services.length + (host.services.length === 1 ? " service" : " services");
+        return item;
+      }));
     }
   };
 }

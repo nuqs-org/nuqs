@@ -22,7 +22,10 @@
     <div>
       <p class="phase" id="phase" aria-live="polite">{{.Phase}}</p>
       <div class="progressBar" role="progressbar" aria-label="Scan progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{whole .Percent}}" id="progressBar"><i id="progressFill" style="width:{{whole .Percent}}%"></i></div>
-      <p class="progressNumbers"><span id="percentText">{{whole .Percent}}%</span> · <span id="remaining">{{if .Remaining}}{{.Remaining}}{{else}}working out the time left{{end}}</span> · <span id="elapsed" class="mono">{{duration .Elapsed.Seconds}}</span> so far</p>
+      <p class="progressNumbers"><span id="percentText">{{whole .Percent}}%</span> · <span id="remaining">{{if .Remaining}}{{.Remaining}}{{else}}working out the time left{{end}}</span> · <span id="elapsed" class="mono">{{duration .Elapsed.Seconds}}</span> so far · <span id="hostsFound">{{.HostsFound}} hosts found</span></p>
+      <p class="liveActivity" id="liveActivity" aria-live="polite">Starting the scan…</p>
+      <p class="liveStats"><span id="liveChecks">0 checks complete</span> · <span id="liveFindings">0 findings</span></p>
+      <div id="liveHosts" class="liveHosts" aria-live="polite"></div>
     </div>
   </div>
   {{else if eq .Status "failed"}}
@@ -108,6 +111,7 @@
         </table>{{else}}<p class="emptyRow">{{if .Filters.Active}}No findings match these filters.{{else}}Nothing found. Every check that ran came back clean.{{end}}</p>{{end}}
       </div>
       {{end}}
+      {{end}}
       {{if .Errors}}
       <div class="card warnCard">
         <h2>{{len .Errors}} {{if eq (len .Errors) 1}}check{{else}}checks{{end}} couldn't finish</h2>
@@ -115,11 +119,10 @@
         <ul class="errorList">{{range .Errors}}<li><span class="mono">{{.Host}}:{{.Port}}</span> · {{.CheckID}} · {{.Error}}</li>{{end}}</ul>
       </div>
       {{end}}
-      {{else if eq .Status "running"}}
-      <p class="emptyRow">Hosts and findings show up here when the scan finishes.</p>
-      {{else if eq .Status "stopped"}}
-      <p class="emptyRow card">Stopped before Nmap finished finding hosts, so there's nothing to show. <a href="/scans/new">Start a new scan</a></p>
+      {{if eq .Status "stopped"}}
+        {{if .Report}}<p class="emptyRow card">Stopped early. Hosts and findings found so far are shown above; the remaining checks didn't run.</p>{{else}}<p class="emptyRow card">Stopped before any host was discovered, so there's nothing to show. <a href="/scans/new">Start a new scan</a></p>{{end}}
       {{end}}
+      {{if eq .Status "running"}}<p class="emptyRow">Hosts and findings show up here when the scan finishes.</p>{{end}}
     </div>
     <aside class="card detailsCard">
       <h2>Scan details</h2>
